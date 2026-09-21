@@ -1,0 +1,13 @@
+{
+  "name": "sinsi-mp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "신시 LAN 협동 최소 슬라이스 - 권위 서버 (위치 동기화만)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
