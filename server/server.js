@@ -198,8 +198,12 @@ function nearestPlayer(x, y) {
 }
 function alivePlayers() { return [...players.values()].filter(p => p.alive); }
 
+function pickFreeColor() {
+  const used = new Set([...players.values()].map(p => p.color));
+  return COLORS.find(c => !used.has(c)) || COLORS[players.size % COLORS.length];
+}
 function newPlayer(id, ws) {
-  const color = COLORS[(id - 1) % COLORS.length];
+  const color = pickFreeColor();
   const spawnPt = alivePlayers()[0] || { x: WS_SIZE/2, y: WS_SIZE/2 };
   const pl = {
     id, ws, name: `무당${id}`, color,
