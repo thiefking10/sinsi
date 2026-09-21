@@ -583,7 +583,7 @@ function updFx(dt){
 }
 function render(dt){
   g.fillStyle='#0d080a';g.fillRect(0,0,W,H);
-  if(!state){requestAnimationFrame(loop);return;}
+  if(!state){return;}
   const me=state.players.find(p=>p.id===myId);
   const focus=me||{x:WS_SIZE/2,y:WS_SIZE/2};
   cam.x=lerp(cam.x,focus.x,.12);cam.y=lerp(cam.y,focus.y,.12);

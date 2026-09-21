@@ -537,7 +537,12 @@ function playerView(pl) {
     maxSouls: stat.maxSouls(pl), kills: pl.kills, alive: pl.alive, invFlicker: pl.invCd>0 };
 }
 function broadcastState() {
-  const state = {
+  // 파티가 전멸/승리해서 room이 끝난 상태면, 다시 시작할 때까지 무거운 배열은 안 보낸다(적 수십 마리를 매 틱 얼려서 보낼 이유가 없다).
+  const state = room.over
+    ? { type:'state', t: room.t, c: Math.round(room.c*10)/10, stage: room.stage, trans: room.trans, over: room.over,
+        obs:[], en:[], proj:[], eproj:[], sp:[], drops:[], loot:[], boss:null,
+        players: [...players.values()].map(playerView), events: room.events }
+    : {
     type: 'state', t: room.t, c: Math.round(room.c*10)/10, stage: room.stage, trans: room.trans, over: room.over,
     obs: room.obs.map(o => ({ x:Math.round(o.x), y:Math.round(o.y), r:Math.round(o.r*o.rise), kind:o.kind })),
     en: room.en.map(e => ({ type:e.type, x:Math.round(e.x), y:Math.round(e.y), r:e.r, hp:Math.round(e.hp), max:Math.round(e.max),
