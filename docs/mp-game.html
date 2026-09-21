@@ -128,6 +128,13 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #detail .hint{font-size:13px;color:var(--dim);margin:0;line-height:1.6}
 .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .acts .go{width:auto;padding:10px 18px;font-size:14px}
+#clsPick{display:flex;gap:10px;margin:16px 0}
+.clspick{flex:1;text-align:left;font:inherit;color:var(--ink);background:rgba(0,0,0,.3);
+  border:2px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
+.clspick.sel{border-color:var(--gold);background:rgba(230,180,74,.12)}
+.clspick b{display:block;font-family:'Nanum Myeongjo',serif;font-size:16px;color:var(--gold);margin-bottom:4px}
+.clspick small{display:block;font-size:12px;color:var(--dim);line-height:1.5}
+@media (orientation:portrait){#clsPick{flex-direction:column}}
 </style>
 </head>
 <body>
@@ -136,6 +143,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <div class="row"><span id="stName">평온</span><span id="cVal">저주 0</span></div>
   <div class="bar"><i id="cFill"></i></div>
   <div class="sub"><span>체력</span><div class="bar"><i id="hpFill"></i></div><span id="oil">신수 0</span></div>
+  <div class="sub" id="furyRow" style="display:none"><span>분노</span><div class="bar"><i id="furyFill" style="background:#d96a4a"></i></div><span></span></div>
   <div class="sub"><span id="lvTxt">Lv 1</span><div class="bar"><i id="xpFill"></i></div></div>
 </div>
 <div id="tr">
@@ -179,6 +187,14 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <div class="card" id="card">
     <h1>신시<span>협동 강하</span></h1>
     <p>같은 와이파이의 무당들과 함께 저주를 막는다. 함께 싸우고, 함께 버틴다.</p>
+    <div id="clsPick">
+      <button class="clspick sel" id="clsMudang" data-cls="mudang">
+        <b>무당</b><small>방울 원거리 공격, 원혼 소환. 저주를 낮게 눌러두며 싸운다.</small>
+      </button>
+      <button class="clspick" id="clsJeonsa" data-cls="jeonsa">
+        <b>청동전사</b><small>근접 베기, 분노를 모아 돌진·광란. 저주가 높을수록 강해진다.</small>
+      </button>
+    </div>
     <input id="nameInput" maxlength="12" placeholder="이름 (무당1 등 기본값)">
     <button class="go" id="goBtn">강하 시작</button>
     <div id="connMsg"></div>
@@ -250,7 +266,10 @@ const SFX={
   zap(){if(!thr('zap',60))return;noise(.12,.12,3000,0,'highpass');tone(1800,.1,'sawtooth',.03,0,600);},
   legend(){tone(98,2.6,'sine',.2);[1,1.25,1.5,2].forEach((m,i)=>tone(880*m,.6,'sine',.05,.1+i*.09));},
   rare(){[1,1.5].forEach((m,i)=>tone(1200*m,.3,'sine',.04,i*.07));},
-  equip(){noise(.08,.1,1500);tone(600,.12,'triangle',.05);}
+  equip(){noise(.08,.1,1500);tone(600,.12,'triangle',.05);},
+  slash(){if(!thr('slash',110))return;noise(.09,.13,2200,0,'bandpass');tone(180,.08,'sawtooth',.05,0,90);},
+  dash(){if(!thr('dash',60))return;noise(.18,.1,2400,0,'bandpass');},
+  frenzy(){tone(140,.5,'sawtooth',.1,0,60);noise(.3,.12,1500,0,'bandpass');}
 };
 
 /* ───────── 상태 ───────── */
@@ -259,7 +278,9 @@ const STAGE_NAME=['평온','징후','침식','전화 임박','저주에 삼켜�
 const STAGE_COL=['#efe4cc','#d9c08e','#7cc2b0','#e07a6a','#e05548'];
 
 /* ───────── 아이템 (표시용 — 실제 굴림은 서버 권위) ───────── */
-const SLOT_NAME={bell:'방울',fan:'부채',robe:'무복',trinket:'노리개'};
+const SLOT_NAME_MUDANG={bell:'방울',fan:'부채',robe:'무복',trinket:'노리개'};
+const SLOT_NAME_JEONSA={bell:'무기',fan:'방패',robe:'갑주',trinket:'노리개'};
+const SLOT_NAME=new Proxy({},{get:(_,k)=>(myCls==='jeonsa'?SLOT_NAME_JEONSA:SLOT_NAME_MUDANG)[k]});
 const SLOT_KEYS=['bell','fan','robe','trinket'];
 const BAG_MAX=12;
 const RAR=[{n:'일반',c:'#d8d2c2',salv:1},{n:'마법',c:'#6fa8ff',salv:2},{n:'희귀',c:'#f0d25a',salv:4},{n:'전설',c:'#ff8a3a',salv:8}];
@@ -299,10 +320,19 @@ function genTiles(seed,trans){
 
 /* ───────── 네트워크 ───────── */
 const wsUrl=`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}`;
+let myCls='mudang';
+function applyClassUI(){
+  const jeonsa=myCls==='jeonsa';
+  $('furyRow').style.display=jeonsa?'flex':'none';
+  $('bSum').querySelector('span').textContent=jeonsa?'돌진':'초혼';
+  const soulCt=$('soulCt'); if(soulCt)soulCt.style.display=jeonsa?'none':'block';
+  $('bSal').querySelector('span').textContent=jeonsa?'광란':'살풀이';
+  $('bAtk').querySelector('span').textContent=jeonsa?'베기':'방울';
+}
 function sendName(){
   if(!ws||ws.readyState!==1)return;
   const nm=$('nameInput').value.trim();
-  if(nm)ws.send(JSON.stringify({type:'name',name:nm}));
+  ws.send(JSON.stringify({type:'name',name:nm,cls:myCls}));
 }
 function connect(){
   $('connMsg').textContent='서버에 접속 중...';
@@ -314,7 +344,8 @@ function connect(){
     const m=JSON.parse(ev.data);
     if(m.type==='welcome'){
       myId=m.id;WS_SIZE=m.world.w;TS=m.world.ts;TN=m.world.tn;genTiles(m.seed,m.trans);downSince=null;
-      sendName();
+    }else if(m.type==='classConfirm'){
+      myCls=m.cls;applyClassUI();
     }else if(m.type==='state'){
       state=m;
       for(const e of m.events)handleEvent(e);
@@ -352,6 +383,9 @@ function handleEvent(e){
   else if(e.type==='rare'){SFX.rare();}
   else if(e.type==='pick'){if(e.id===myId){SFX.pick();addTxt(e.x,e.y-36,e.name,e.color,e.big);}}
   else if(e.type==='bagFull'){if(e.id===myId)toast('가방이 가득 찼다. 가방에서 분해하세요');}
+  else if(e.type==='slash'){SFX.slash();fx.push({type:'swipe',x:e.x,y:e.y,face:e.face,r:e.r,arc:e.arc,t:0,life:.16});}
+  else if(e.type==='charge'){SFX.dash();fx.push({type:'swipe',x:e.x,y:e.y,face:e.face,r:70,arc:.5,t:0,life:.2});}
+  else if(e.type==='frenzy'){SFX.frenzy();shake=Math.max(shake,.3);fx.push({type:'ring',x:e.x,y:e.y,t:0,life:.5,max:95,col:'217,106,74',thin:true});}
 }
 
 /* ───────── 입력 ───────── */
@@ -552,6 +586,12 @@ function drawPlayer(p){
   const bob=Math.sin(state.t*6)*1,sw=Math.sin(state.t*4.3)*2.4,fx2=p.x,fy=p.y+bob,fa=p.face;
   g.fillStyle=p.color+'22';g.beginPath();g.arc(fx2,fy,36,0,6.28);g.fill();
   g.fillStyle='rgba(0,0,0,.4)';g.beginPath();g.ellipse(p.x,p.y+13,13,5,0,0,6.28);g.fill();
+  if(p.cls==='jeonsa')drawJeonsa(p,fx2,fy,fa,sw);else drawMudang(p,fx2,fy,fa,sw);
+  g.fillStyle=p.id===myId?'#e6b44a':'#efe4cc';g.font='12px "Gowun Dodum", sans-serif';g.textAlign='center';
+  g.fillText(p.name,fx2,fy-34);
+  if(p.hp<p.max){g.fillStyle='rgba(0,0,0,.6)';g.fillRect(fx2-16,fy-31,32,4);g.fillStyle='#c2413c';g.fillRect(fx2-16,fy-31,32*Math.max(0,p.hp/p.max),4);}
+}
+function drawMudang(p,fx2,fy,fa,sw){
   g.fillStyle='#d9ccae';g.beginPath();g.ellipse(fx2-Math.cos(fa)*4-9,fy-1-Math.sin(fa)*2+sw*.3,7.5,11,-.35,0,6.28);g.fill();
   g.fillStyle='#efe4cc';
   g.beginPath();g.moveTo(fx2-6.5,fy-9);g.quadraticCurveTo(fx2-12.5,fy+6,fx2-9.5,fy+13);
@@ -566,9 +606,25 @@ function drawPlayer(p){
   g.beginPath();g.moveTo(fx2-4.2,fy-19);g.lineTo(fx2,fy-28);g.lineTo(fx2+4.2,fy-19);g.closePath();g.fill();
   const bx=fx2+Math.cos(fa)*18,by=fy+Math.sin(fa)*18-2;
   g.fillStyle='#e6b44a';g.beginPath();g.arc(bx,by,4,0,6.28);g.fill();
-  g.fillStyle=p.id===myId?'#e6b44a':'#efe4cc';g.font='12px "Gowun Dodum", sans-serif';g.textAlign='center';
-  g.fillText(p.name,fx2,fy-34);
-  if(p.hp<p.max){g.fillStyle='rgba(0,0,0,.6)';g.fillRect(fx2-16,fy-31,32,4);g.fillStyle='#c2413c';g.fillRect(fx2-16,fy-31,32*Math.max(0,p.hp/p.max),4);}
+}
+function drawJeonsa(p,fx2,fy,fa,sw){
+  // 청동전사: 떡 벌어진 어깨, 청동 갑주, 손에 비파형 동검
+  g.fillStyle='#5a4028';g.beginPath();g.ellipse(fx2,fy+2,12,13,0,0,6.28);g.fill();
+  g.fillStyle='#b07a3a';
+  g.beginPath();g.moveTo(fx2-11,fy-6);g.lineTo(fx2+11,fy-6);g.lineTo(fx2+9,fy+13);g.lineTo(fx2-9,fy+13);g.closePath();g.fill();
+  g.fillStyle='#c48a3c';
+  for(let k=0;k<3;k++)g.fillRect(fx2-9+k*6.2,fy-3,4.4,13);
+  g.fillStyle=p.color;g.beginPath();g.ellipse(fx2,fy-2,4,6,0,0,6.28);g.fill();
+  g.fillStyle='#8a6a3a';
+  g.beginPath();g.ellipse(fx2-Math.cos(fa)*5,fy-3+sw*.2,5,7,fa,0,6.28);g.fill();
+  g.beginPath();g.ellipse(fx2+Math.cos(fa)*10,fy-2+Math.sin(fa)*4,5.5,8,fa,0,6.28);g.fill();
+  const sx=fx2+Math.cos(fa)*20,sy=fy+Math.sin(fa)*20-3;
+  g.strokeStyle='#d8b878';g.lineWidth=3;g.lineCap='round';
+  g.beginPath();g.moveTo(fx2+Math.cos(fa)*12,fy+Math.sin(fa)*12-3);g.lineTo(sx,sy);g.stroke();
+  g.fillStyle='#f4ecdc';g.beginPath();g.arc(fx2,fy-15,7.5,0,6.28);g.fill();
+  g.fillStyle='#3a2414';g.beginPath();g.arc(fx2,fy-16,7.8,Math.PI*1.15,Math.PI*1.95);g.fill();
+  g.fillStyle='#c48a3c';g.beginPath();g.moveTo(fx2-3,fy-22);g.lineTo(fx2-6,fy-28);g.lineTo(fx2-1,fy-24);g.closePath();g.fill();
+  g.beginPath();g.moveTo(fx2+3,fy-22);g.lineTo(fx2+6,fy-28);g.lineTo(fx2+1,fy-24);g.closePath();g.fill();
 }
 function updFx(dt){
   for(const f of fx){f.t+=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.9;f.vy*=.9;}}
@@ -634,6 +690,8 @@ function render(dt){
       g.beginPath();g.moveTo(f.x,f.y);g.arc(f.x,f.y,f.r*Math.min(1,k*1.6),a,a+.45);g.closePath();g.fill();}}
     else if(f.type==='shock'){g.strokeStyle=`rgba(196,138,60,${(1-k)*.9})`;g.lineWidth=10;g.beginPath();g.arc(f.x,f.y,f.max*k,0,6.28);g.stroke();}
     else if(f.type==='pop'){g.strokeStyle=`rgba(255,255,255,${(1-k)*.9})`;g.lineWidth=3*(1-k)+1;g.beginPath();g.arc(f.x,f.y,f.r*(1+k*1.4),0,6.28);g.stroke();}
+    else if(f.type==='swipe'){g.strokeStyle=`rgba(230,210,180,${(1-k)*.85})`;g.lineWidth=6*(1-k)+2;
+      g.beginPath();g.arc(f.x,f.y,f.r*(0.4+k*.6),f.face-f.arc/2,f.face+f.arc/2);g.stroke();}
     else if(f.type==='p'){g.fillStyle=f.col;g.globalAlpha=1-k;g.beginPath();g.arc(f.x,f.y,f.r,0,6.28);g.fill();g.globalAlpha=1;}}
   g.textAlign='center';
   for(const t of txt){g.globalAlpha=1-t.t/t.life;g.fillStyle=t.col;
@@ -662,16 +720,22 @@ function updHud(){
   $('stName').textContent=STAGE_NAME[state.stage];$('stName').style.color=STAGE_COL[state.stage];
   $('cVal').textContent=state.trans?'되돌릴 수 없음':'저주 '+Math.floor(state.c);
   if(me){
+    if(me.cls!==myCls){myCls=me.cls;applyClassUI();}
     $('hpFill').style.width=(me.hp/me.max*100)+'%';
     $('xpFill').style.width=(me.xp/me.xpNeed*100)+'%';
     $('lvTxt').textContent='Lv '+me.lv;
     $('oil').textContent='신수 '+me.oil;
-    $('soulCt').textContent='넋 '+me.souls+'/'+me.maxSouls;
-    $('bSum').classList.toggle('off',me.souls<=0);
+    if(me.cls==='jeonsa'){
+      $('furyFill').style.width=(me.fury/me.maxFury*100)+'%';
+      $('bSum').classList.toggle('off',false);
+    }else{
+      $('soulCt').textContent='넋 '+me.souls+'/'+me.maxSouls;
+      $('bSum').classList.toggle('off',me.souls<=0);
+    }
   }
   $('party').innerHTML=state.players.map(p=>`
     <div class="pmem${p.alive?'':' down'}">
-      <div class="pname"><span style="color:${p.color}">${p.id===myId?'★ ':''}${p.name}</span><small>${p.alive?'Lv'+p.lv:'쓰러짐'}</small></div>
+      <div class="pname"><span style="color:${p.color}">${p.id===myId?'★ ':''}${p.name}</span><small>${p.alive?(p.cls==='jeonsa'?'전사 ':'무당 ')+'Lv'+p.lv:'쓰러짐'}</small></div>
       <div class="pbar"><i style="width:${Math.max(0,p.hp/p.max*100)}%"></i></div>
     </div>`).join('');
   const downed=me&&!me.alive&&running&&!state.over;
@@ -698,6 +762,13 @@ let last=performance.now();
 function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
   updFx(dt);render(dt);updHud();requestAnimationFrame(loop);}
 
+for(const el of document.querySelectorAll('.clspick')){
+  el.addEventListener('click',()=>{
+    myCls=el.dataset.cls;
+    document.querySelectorAll('.clspick').forEach(b=>b.classList.toggle('sel',b===el));
+    applyClassUI();
+  });
+}
 $('goBtn').addEventListener('click',()=>{initAudio();sendName();if(state&&state.over)ws.send(JSON.stringify({type:'restart'}));$('screen').classList.add('hide');running=true;});
 connect();
 requestAnimationFrame(loop);
