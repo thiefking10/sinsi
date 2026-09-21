@@ -698,7 +698,7 @@ let last=performance.now();
 function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
   updFx(dt);render(dt);updHud();requestAnimationFrame(loop);}
 
-$('goBtn').addEventListener('click',()=>{initAudio();sendName();$('screen').classList.add('hide');running=true;});
+$('goBtn').addEventListener('click',()=>{initAudio();sendName();if(state&&state.over)ws.send(JSON.stringify({type:'restart'}));$('screen').classList.add('hide');running=true;});
 connect();
 requestAnimationFrame(loop);
 })();
