@@ -71,7 +71,25 @@ const UP_JEONSA = [
   { id:'rageSpeed', name:'격노의 질주', max:2, desc:()=>'분노가 절반 이상이면 이동 속도 +15%' }
 ];
 const UP_JEONSA_BY = {}; UP_JEONSA.forEach(u => UP_JEONSA_BY[u.id] = u);
-const UP_OF = pl => pl.cls === 'jeonsa' ? UP_JEONSA : UP;
+
+const UP_BEOMJOK = [
+  { id:'sharpdart', name:'날카로운 발톱',  max:3, desc:()=>'발톱 피해 +20%' },
+  { id:'quickdart', name:'빠른 사냥',      max:4, desc:()=>'발톱을 15% 더 빨리 던진다' },
+  { id:'bleedamp',  name:'짙은 피 냄새',   max:3, desc:()=>'출혈 피해 +30%, 지속시간 +1초' },
+  { id:'ferocap',   name:'끓어오르는 야성', max:3, desc:()=>'최대 야성 +20, 야성을 15% 더 빨리 모은다' },
+  { id:'clawdmg',   name:'맹수의 발톱',    max:3, desc:()=>'변신 중 근접 피해 +25%' },
+  { id:'transdur',  name:'긴 변신',        max:2, desc:()=>'변신 지속시간 +2초' },
+  { id:'transcost', name:'익숙한 변신',    max:2, desc:()=>'변신에 필요한 야성 −15' },
+  { id:'pouncedmg', name:'덮치기',         max:2, desc:()=>'도약 피해와 기절 시간이 늘어난다' },
+  { id:'pouncecd',  name:'가벼운 발걸음',  max:2, desc:()=>'도약 대기시간 −20%' },
+  { id:'huntheal',  name:'사냥꾼의 활력',  max:3, desc:()=>'출혈 중인 적을 처치하면 체력을 되찾는다' },
+  { id:'bvital',    name:'범족의 가호',    max:3, desc:()=>'최대 체력 +25, 체력을 모두 되찾는다' },
+  { id:'packsense', name:'무리의 감각',    max:2, desc:()=>'신수를 더 멀리서 끌어오고 더 자주 줍는다' },
+  { id:'primeSpeed',name:'맹수의 발',      max:2, desc:()=>'변신 중이 아닐 때도 이동 속도 +12%' }
+];
+const UP_BEOMJOK_BY = {}; UP_BEOMJOK.forEach(u => UP_BEOMJOK_BY[u.id] = u);
+
+const UP_OF = pl => pl.cls === 'jeonsa' ? UP_JEONSA : pl.cls === 'beomjok' ? UP_BEOMJOK : UP;
 
 /* ───────── 아이템 ───────── */
 const SLOT_NAME = { bell:'방울', fan:'부채', robe:'무복', trinket:'노리개' };
@@ -167,14 +185,16 @@ const stat = {
   magnet: pl => 95 * (1 + .6 * L(pl,'sense')),
   dropMul: pl => (1 + .3 * L(pl,'sense')) * (1 + (pl.G.oil||0)/100),
   speed: pl => {
-    const base = pl.cls === 'jeonsa' ? 155 : 185;
+    const base = pl.cls === 'jeonsa' ? 155 : pl.cls === 'beomjok' ? 200 : 185;
     const rageBonus = pl.cls === 'jeonsa' && L(pl,'rageSpeed') && pl.fury >= stat.maxFury(pl)/2 ? .15 : 0;
-    return base * (1 + .12*L(pl,'swift') + rageBonus + (pl.G.speed||0)/100);
+    const primeBonus = pl.cls === 'beomjok' ? .12*L(pl,'primeSpeed') : 0;
+    const transBonus = pl.cls === 'beomjok' && pl.transformed ? .4 : 0;
+    return base * (1 + .12*L(pl,'swift') + rageBonus + primeBonus + transBonus + (pl.G.speed||0)/100);
   },
   crit: pl => .15 + (pl.G.crit||0)/100, critMul: pl => 2 + (pl.G.critDmg||0)/100,
   maxHp: pl => {
-    const base = pl.cls === 'jeonsa' ? 150 : 100;
-    const vitalUp = pl.cls === 'jeonsa' ? 30*L(pl,'jvital') : 25*L(pl,'vital');
+    const base = pl.cls === 'jeonsa' ? 150 : pl.cls === 'beomjok' ? 90 : 100;
+    const vitalUp = pl.cls === 'jeonsa' ? 30*L(pl,'jvital') : pl.cls === 'beomjok' ? 25*L(pl,'bvital') : 25*L(pl,'vital');
     return Math.round(base + vitalUp + (pl.G.hp||0));
   },
   // ── 청동전사 전용 ──
@@ -195,7 +215,19 @@ const stat = {
   frenzyDmg: pl => 10 * (1 + .25*L(pl,'frenzydmg')) * stat.curseMul(pl),
   frenzyLife: pl => 1.6 + .5*L(pl,'frenzydmg'),
   lifestealPct: pl => .06 * L(pl,'lifesteal'),
-  armorPct: pl => Math.min(.4, .08 * L(pl,'armor'))
+  armorPct: pl => Math.min(.4, .08 * L(pl,'armor')),
+  // ── 범족 사냥꾼 전용 ──
+  maxFerocity: pl => 100 + 20*L(pl,'ferocap'),
+  dartCd: pl => .45 / (1 + .15*L(pl,'quickdart') + (pl.G.atkSpd||0)/100),
+  dartDmg: pl => 12 * (1 + .2*L(pl,'sharpdart') + (pl.G.bellDmg||0)/100),
+  clawCd: pl => .28 / (1 + .15*L(pl,'quickdart') + (pl.G.atkSpd||0)/100),
+  clawDmg: pl => 14 * (1 + .25*L(pl,'clawdmg') + (pl.G.bellDmg||0)/100),
+  bleedDmg: pl => 3 * (1 + .3*L(pl,'bleedamp') + (pl.G.bellDmg||0)/100),
+  bleedTime: pl => 3 + L(pl,'bleedamp'),
+  transformCost: pl => Math.max(30, 60 - 15*L(pl,'transcost')),
+  transformDur: pl => 5 + 2*L(pl,'transdur'),
+  pounceCd: pl => 4 * (1 - .2*L(pl,'pouncecd')),
+  pounceDmg: pl => 20 * (1 + .3*L(pl,'pouncedmg'))
 };
 const xpNeed = pl => 9 + (pl.lv - 1) * 6;
 
@@ -246,35 +278,44 @@ function pickFreeColor() {
   const used = new Set([...players.values()].map(p => p.color));
   return COLORS.find(c => !used.has(c)) || COLORS[players.size % COLORS.length];
 }
+const CLASS_NAMES = { mudang:'무당', jeonsa:'청동전사', beomjok:'범족사냥꾼' };
+const CLASS_WEAPON = {
+  mudang:  { name:'낡은 방울', mod:5 },
+  jeonsa:  { name:'녹슨 비파형 동검', mod:5 },
+  beomjok: { name:'낡은 사냥칼', mod:5 }
+};
+function normCls(cls) { return cls === 'jeonsa' || cls === 'beomjok' ? cls : 'mudang'; }
+function startWeapon(cls) {
+  const w = CLASS_WEAPON[cls];
+  return { id: itemUid++, slot:'bell', r:0, name:w.name, base:w.name, mods:[{k:'bellDmg',v:w.mod,imp:true}], leg:null };
+}
 function newPlayer(id, ws, cls) {
-  cls = cls === 'jeonsa' ? 'jeonsa' : 'mudang';
+  cls = normCls(cls);
   const color = pickFreeColor();
   const spawnPt = alivePlayers()[0] || { x: WS_SIZE/2, y: WS_SIZE/2 };
   const pl = {
-    id, ws, cls, name: cls === 'jeonsa' ? `청동전사${id}` : `무당${id}`, color,
+    id, ws, cls, name: `${CLASS_NAMES[cls]}${id}`, color,
     x: clamp(spawnPt.x + (Math.random()*80-40), 20, WS_SIZE-20),
     y: clamp(spawnPt.y + (Math.random()*80-40), 20, WS_SIZE-20),
     hp: 100, max: 100, face: 0, mv: 0,
     lv: 1, xp: 0, up: {}, pendingLv: 0, choosing: null,
     atkCd: 0, sumCd: 0, salCd: 0, invCd: 0, obangCd: 0,
-    oil: 0, oilTotal: 0, souls: 0, fury: 0, sinceHit: 99, chargeCd: 0, chargeT: 0, frenzyT: 0, frenzyTick: 0, kills: 0, legends: 0, alive: true, classSet: false,
+    oil: 0, oilTotal: 0, souls: 0, fury: 0, sinceHit: 99, chargeCd: 0, chargeT: 0, frenzyT: 0, frenzyTick: 0,
+    ferocity: 0, transformed: false, transformT: 0, transformCd: 0, pounceCd: 0,
+    kills: 0, legends: 0, alive: true, classSet: false,
     eq: { bell:null, fan:null, robe:null, trinket:null }, bag: [], G: {}, leg: new Set(),
     input: { dx: 0, dy: 0, atk: false }
   };
-  pl.eq.bell = cls === 'jeonsa'
-    ? { id: itemUid++, slot:'bell', r:0, name:'녹슨 비파형 동검', base:'녹슨 비파형 동검', mods:[{k:'bellDmg',v:5,imp:true}], leg:null }
-    : { id: itemUid++, slot:'bell', r:0, name:'낡은 방울', base:'낡은 방울', mods:[{k:'bellDmg',v:5,imp:true}], leg:null };
+  pl.eq.bell = startWeapon(cls);
   recalc(pl); pl.hp = pl.max;
   return pl;
 }
 function setClass(pl, cls) {
   if (pl.classSet) return; // 접속 직후 강하 시작 전 한 번만 고를 수 있다
-  cls = cls === 'jeonsa' ? 'jeonsa' : 'mudang';
+  cls = normCls(cls);
   pl.cls = cls; pl.classSet = true;
-  pl.name = pl.name.startsWith('무당') || pl.name.startsWith('청동전사') ? (cls === 'jeonsa' ? `청동전사${pl.id}` : `무당${pl.id}`) : pl.name;
-  pl.eq.bell = cls === 'jeonsa'
-    ? { id: itemUid++, slot:'bell', r:0, name:'녹슨 비파형 동검', base:'녹슨 비파형 동검', mods:[{k:'bellDmg',v:5,imp:true}], leg:null }
-    : { id: itemUid++, slot:'bell', r:0, name:'낡은 방울', base:'낡은 방울', mods:[{k:'bellDmg',v:5,imp:true}], leg:null };
+  if (Object.values(CLASS_NAMES).some(n => pl.name.startsWith(n))) pl.name = `${CLASS_NAMES[cls]}${pl.id}`;
+  pl.eq.bell = startWeapon(cls);
   recalc(pl); pl.hp = pl.max;
 }
 
@@ -347,6 +388,7 @@ function killEnemy(e) {
   if (e.type === 'bomber' && !e.fused) explode(e.x, e.y, 80, 40);
   const owner = e.lastSrc ? players.get(e.lastSrc) : null;
   if (owner && HAS(owner,'shackle') && e.curse > 0) explode(e.x, e.y, 65, 20*(1+room.t/240));
+  if (owner && owner.cls === 'beomjok' && e.bleedT > 0 && L(owner,'huntheal')) owner.hp = Math.min(owner.max, owner.hp + 6*L(owner,'huntheal'));
   if (owner) owner.kills++;
   if (e.noReward) return;
   if (e.type !== 'boss' && owner && owner.alive) {
@@ -377,6 +419,7 @@ function spawnEnemy(type, x, y) {
 function hurt(pl, d) {
   if (!pl.alive) return;
   if (pl.cls === 'jeonsa') { d *= (1 - stat.armorPct(pl)); pl.fury = Math.min(stat.maxFury(pl), pl.fury + 10); pl.sinceHit = 0; }
+  else if (pl.cls === 'beomjok') { pl.ferocity = Math.min(stat.maxFerocity(pl), pl.ferocity + 8); pl.sinceHit = 0; }
   pl.hp -= d; pl.invCd = .4;
   ev('hurt', { id: pl.id, x: pl.x, y: pl.y, amt: Math.round(d) });
   if (HAS(pl,'obang') && pl.obangCd <= 0 && pl.hp > 0) {
@@ -428,6 +471,44 @@ function frenzy(pl) {
   if (pl.fury < cost) return;
   pl.fury -= cost; pl.frenzyT = stat.frenzyLife(pl); pl.frenzyTick = 0;
   ev('frenzy', { x: pl.x, y: pl.y });
+}
+// ── 범족 사냥꾼 전투 ──
+function applyBleed(e, pl) { e.bleedT = stat.bleedTime(pl); e.bleedSrc = pl.id; }
+function dart(pl) {
+  ev('dart', { x: pl.x, y: pl.y, face: pl.face });
+  room.proj.push({ x: pl.x+Math.cos(pl.face)*14, y: pl.y+Math.sin(pl.face)*14, vx: Math.cos(pl.face)*520, vy: Math.sin(pl.face)*520, t:0, life:.7, hits: new Set(), pierce: 1, owner: pl.id, kind:'dart' });
+}
+function claw(pl) {
+  const R = 62, half = .55; let hitAny = false;
+  for (const e of room.en) {
+    if (e.hp<=0) continue;
+    const dx=e.x-pl.x, dy=e.y-pl.y, d=Math.hypot(dx,dy);
+    if (d > R+e.r) continue;
+    let da = Math.atan2(dy,dx) - pl.face; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI;
+    if (Math.abs(da) > half) continue;
+    hitEnemy(e, stat.clawDmg(pl), dx/(d||1)*160, dy/(d||1)*160, true, pl.id, 'claw');
+    applyBleed(e, pl); hitAny = true;
+  }
+  if (hitAny) { pl.ferocity = Math.min(stat.maxFerocity(pl), pl.ferocity+6); pl.sinceHit = 0; }
+  ev('claw', { x: pl.x, y: pl.y, face: pl.face });
+}
+function tigerForm(pl) {
+  if (pl.transformed) { pl.transformed = false; pl.transformT = 0; pl.transformCd = 2; ev('detransform', { x: pl.x, y: pl.y }); return; }
+  if (pl.transformCd > 0) return;
+  const cost = stat.transformCost(pl);
+  if (pl.ferocity < cost) return;
+  pl.ferocity -= cost; pl.transformed = true; pl.transformT = stat.transformDur(pl);
+  ev('beastform', { x: pl.x, y: pl.y });
+}
+function pounce(pl) {
+  if (pl.pounceCd > 0) return;
+  pl.pounceCd = stat.pounceCd(pl); pl.invCd = Math.max(pl.invCd, .2);
+  ev('pounce', { x: pl.x, y: pl.y, face: pl.face });
+  const dx = Math.cos(pl.face), dy = Math.sin(pl.face);
+  pl.x = clamp(pl.x + dx*150, 20, WS_SIZE-20); pl.y = clamp(pl.y + dy*150, 20, WS_SIZE-20);
+  collideObs(pl, 14);
+  const dmg = stat.pounceDmg(pl);
+  for (const e of room.en) { if (e.hp<=0) continue; const d=Math.hypot(e.x-pl.x,e.y-pl.y); if (d<90) { hitEnemy(e, dmg, dx*300, dy*300, true, pl.id, 'pounce'); applyBleed(e, pl); e.st = Math.max(e.st, 1); } }
 }
 function summon(pl) {
   if (pl.sumCd > 0) return;
@@ -492,6 +573,17 @@ function tickPlayer(pl) {
       }
     }
     if (pl.sinceHit > 2) pl.fury = Math.max(0, pl.fury - 12*DT);
+  } else if (pl.cls === 'beomjok') {
+    pl.transformCd -= DT; pl.pounceCd -= DT;
+    if (pl.transformed) {
+      pl.transformT -= DT;
+      if (pl.transformT <= 0) { pl.transformed = false; pl.transformCd = 2; }
+    }
+    if (pl.input.atk && pl.atkCd <= 0) {
+      if (pl.transformed) { pl.atkCd = stat.clawCd(pl); claw(pl); }
+      else { pl.atkCd = stat.dartCd(pl); dart(pl); }
+    }
+    if (pl.sinceHit > 2.5) pl.ferocity = Math.max(0, pl.ferocity - 10*DT);
   } else {
     if (pl.input.atk && pl.atkCd <= 0) { pl.atkCd = stat.atkCd(pl); fireBell(pl); }
     if (L(pl,'auto') && pl.souls >= stat.maxSouls(pl) && pl.sumCd <= 0) summon(pl);
@@ -546,11 +638,20 @@ function tick() {
     }
   }
 
-  // 방울 투사체
+  // 방울/발톱 투사체
   for (const pr of room.proj) {
     pr.t += DT; pr.x += pr.vx*DT; pr.y += pr.vy*DT;
     for (const e of room.en) { if (e.hp<=0 || pr.hits.has(e)) continue;
-      if (Math.hypot(e.x-pr.x, e.y-pr.y) < e.r+9) { const owner=players.get(pr.owner); hitEnemy(e, stat.bellDmg(owner||{up:{},G:{}}), pr.vx*.25, pr.vy*.25, true, pr.owner, 'bell'); pr.hits.add(e); pr.pierce--; if (pr.pierce<=0) { pr.dead=true; break; } } }
+      if (Math.hypot(e.x-pr.x, e.y-pr.y) < e.r+9) {
+        const owner=players.get(pr.owner);
+        if (pr.kind === 'dart') {
+          hitEnemy(e, owner?stat.dartDmg(owner):8, pr.vx*.25, pr.vy*.25, true, pr.owner, 'dart');
+          if (owner) { applyBleed(e, owner); owner.ferocity = Math.min(stat.maxFerocity(owner), owner.ferocity+6); owner.sinceHit=0; }
+        } else {
+          hitEnemy(e, stat.bellDmg(owner||{up:{},G:{}}), pr.vx*.25, pr.vy*.25, true, pr.owner, 'bell');
+        }
+        pr.hits.add(e); pr.pierce--; if (pr.pierce<=0) { pr.dead=true; break; }
+      } }
     for (const o of room.obs) { if (o.rise>.5 && Math.hypot(o.x-pr.x,o.y-pr.y)<o.r*o.rise) { pr.dead=true; break; } }
   }
   room.proj = room.proj.filter(pr => !pr.dead && pr.t < pr.life);
@@ -608,6 +709,7 @@ function tick() {
     collideObs(e,e.r); e.x=clamp(e.x,e.r,WS_SIZE-e.r); e.y=clamp(e.y,e.r,WS_SIZE-e.r);
     e.hitCd-=DT; e.flash-=DT; e.curse-=DT;
     if (e.burn>0) { e.burn-=DT; e.burnT=(e.burnT||0)+DT; if (e.burnT>=.5) { e.burnT=0; const bOwner=e.lastSrc?players.get(e.lastSrc):null; hitEnemy(e, bOwner?stat.bellDmg(bOwner)*.45:6, 0, 0, false, e.lastSrc, 'burn'); } }
+    if (e.bleedT>0) { e.bleedT-=DT; e.bleedTick=(e.bleedTick||0)+DT; if (e.bleedTick>=.5) { e.bleedTick=0; const owner=e.bleedSrc?players.get(e.bleedSrc):null; hitEnemy(e, owner?stat.bleedDmg(owner):3, 0, 0, false, e.bleedSrc, 'bleed'); } }
     if (tgt && d<e.r+14 && e.hitCd<=0 && tgt.invCd<=0) { hurt(tgt, e.state==='dash'?Math.round(e.dmg*1.3):e.dmg); e.hitCd=.8; }
     if (e.type==='boss') {
       e.wave-=DT; if (e.wave<=0) { e.wave=3.2; ev('shockwave', {x:e.x,y:e.y}); for (const pl of alivePlayers()) if (pl.invCd<=0 && Math.abs(Math.hypot(pl.x-e.x,pl.y-e.y)-360)<40) hurt(pl,16); }
@@ -650,7 +752,8 @@ function playerView(pl) {
   return { id: pl.id, name: pl.name, cls: pl.cls, color: pl.color, x: Math.round(pl.x), y: Math.round(pl.y), face: Math.round(pl.face*100)/100,
     hp: Math.round(pl.hp), max: pl.max, lv: pl.lv, xp: Math.round(pl.xp), xpNeed: xpNeed(pl), oil: pl.oil, souls: pl.souls,
     maxSouls: stat.maxSouls(pl), fury: Math.round(pl.fury||0), maxFury: pl.cls==='jeonsa'?stat.maxFury(pl):0,
-    frenzy: pl.frenzyT>0, kills: pl.kills, alive: pl.alive, invFlicker: pl.invCd>0 };
+    frenzy: pl.frenzyT>0, ferocity: Math.round(pl.ferocity||0), maxFerocity: pl.cls==='beomjok'?stat.maxFerocity(pl):0,
+    transformed: !!pl.transformed, kills: pl.kills, alive: pl.alive, invFlicker: pl.invCd>0 };
 }
 function broadcastState() {
   // 파티가 전멸/승리해서 room이 끝난 상태면, 다시 시작할 때까지 무거운 배열은 안 보낸다(적 수십 마리를 매 틱 얼려서 보낼 이유가 없다).
@@ -662,7 +765,7 @@ function broadcastState() {
     type: 'state', t: room.t, c: Math.round(room.c*10)/10, stage: room.stage, trans: room.trans, over: room.over,
     obs: room.obs.map(o => ({ x:Math.round(o.x), y:Math.round(o.y), r:Math.round(o.r*o.rise), kind:o.kind })),
     en: room.en.map(e => ({ type:e.type, x:Math.round(e.x), y:Math.round(e.y), r:e.r, hp:Math.round(e.hp), max:Math.round(e.max),
-      flash:e.flash>0, curse:e.curse>0, state:e.state, dx:e.dx, dy:e.dy, st:e.st, wob:e.wob, charge:e.charge, fuse:e.fuse, burn:e.burn>0 })),
+      flash:e.flash>0, curse:e.curse>0, state:e.state, dx:e.dx, dy:e.dy, st:e.st, wob:e.wob, charge:e.charge, fuse:e.fuse, burn:e.burn>0, bleed:e.bleedT>0 })),
     proj: room.proj.map(p => ({ x:Math.round(p.x), y:Math.round(p.y), vx:p.vx, vy:p.vy })),
     eproj: room.eproj.map(q => ({ x:Math.round(q.x), y:Math.round(q.y), r:q.r })),
     sp: room.sp.map(s => ({ owner:s.owner, x:Math.round(s.x), y:Math.round(s.y), idx:s.idx, life:s.life, t:s.t })),
@@ -712,6 +815,8 @@ wss.on('connection', ws => {
       if (!pl.alive) return;
       if (pl.cls === 'jeonsa') {
         if (msg.which==='sum') charge(pl); else if (msg.which==='sal') frenzy(pl); else if (msg.which==='pur') purify(pl);
+      } else if (pl.cls === 'beomjok') {
+        if (msg.which==='sum') tigerForm(pl); else if (msg.which==='sal') pounce(pl); else if (msg.which==='pur') purify(pl);
       } else {
         if (msg.which==='sum') summon(pl); else if (msg.which==='sal') salpuri(pl); else if (msg.which==='pur') purify(pl);
       }
@@ -724,7 +829,9 @@ wss.on('connection', ws => {
       sendTo(pl, { type:'classConfirm', cls: pl.cls });
     } else if (msg.type === 'restart') {
       // 캐릭터(레벨·장비·가방)는 파티가 전멸해도 그대로 이어간다 — 구역(맵·저주·적)만 새로 만든다.
-      if (room.over) { newRoom(); for (const p2 of players.values()) { p2.hp=stat.maxHp(p2);p2.max=stat.maxHp(p2);p2.oil=0;p2.souls=0;p2.fury=0;p2.chargeCd=0;p2.chargeT=0;p2.frenzyT=0;p2.kills=0;p2.alive=true;p2.pendingLv=0;p2.choosing=null;
+      if (room.over) { newRoom(); for (const p2 of players.values()) { p2.hp=stat.maxHp(p2);p2.max=stat.maxHp(p2);p2.oil=0;p2.souls=0;p2.fury=0;p2.chargeCd=0;p2.chargeT=0;p2.frenzyT=0;
+        p2.ferocity=0;p2.transformed=false;p2.transformT=0;p2.transformCd=0;p2.pounceCd=0;
+        p2.kills=0;p2.alive=true;p2.pendingLv=0;p2.choosing=null;
         p2.x=clamp(WS_SIZE/2+(Math.random()*80-40),20,WS_SIZE-20); p2.y=clamp(WS_SIZE/2+(Math.random()*80-40),20,WS_SIZE-20);
         sendTo(p2, { type:'welcome', id:p2.id, color:p2.color, world:{w:WS_SIZE,h:WS_SIZE,ts:TS,tn:TN}, seed: room.seed, trans:false }); } }
     } else if (msg.type === 'equip') {
