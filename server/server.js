@@ -371,7 +371,8 @@ function newPlayer(id, ws, cls) {
     ferocity: 0, transformed: false, transformT: 0, transformCd: 0, pounceCd: 0, thrustCd: 0, timeStopCd: 0,
     kills: 0, legends: 0, alive: true, classSet: false,
     eq: { bell:null, fan:null, robe:null, trinket:null }, bag: [], G: {}, leg: new Set(),
-    input: { dx: 0, dy: 0, atk: false }
+    input: { dx: 0, dy: 0, atk: false },
+    isBot: false, ownerId: null, botsSpawned: false
   };
   pl.eq.bell = startWeapon(cls);
   recalc(pl); pl.hp = pl.max;
@@ -384,6 +385,59 @@ function setClass(pl, cls) {
   if (Object.values(CLASS_NAMES).some(n => pl.name.startsWith(n))) pl.name = `${CLASS_NAMES[cls]}${pl.id}`;
   pl.eq.bell = startWeapon(cls);
   recalc(pl); pl.hp = pl.max;
+}
+// 혼자 협동전을 할 때 데려갈 수 있는 AI 동료. 실제 플레이어와 같은 pl 레코드를 쓰고
+// (players Map에 같이 들어가서 broadcastState·전투·레벨업 로직을 전부 그대로 탄다) ws만 없다.
+function spawnBot(ownerId, cls) {
+  const id = nextId++;
+  const bot = newPlayer(id, null, cls);
+  bot.isBot = true; bot.ownerId = ownerId; bot.classSet = true;
+  bot.name = `${CLASS_NAMES[bot.cls]}·AI`;
+  players.set(id, bot);
+  return bot;
+}
+function tickBotAI(pl) {
+  if (!pl.alive) {
+    if (!room.over) {
+      const anchor = alivePlayers().find(p => !p.isBot) || alivePlayers()[0];
+      pl.x = clamp((anchor?anchor.x:WS_SIZE/2) + (Math.random()*80-40), 20, WS_SIZE-20);
+      pl.y = clamp((anchor?anchor.y:WS_SIZE/2) + (Math.random()*80-40), 20, WS_SIZE-20);
+      pl.hp = stat.maxHp(pl); pl.max = stat.maxHp(pl); pl.alive = true; pl.invCd = 1.2;
+      ev('rejoin', { id: pl.id, x: pl.x, y: pl.y });
+    }
+    return;
+  }
+  if (pl.choosing) chooseUp(pl, pl.choosing[(Math.random()*pl.choosing.length)|0].id);
+
+  let target = null, td = Infinity;
+  for (const e of room.en) { if (e.hp<=0) continue; const d = Math.hypot(e.x-pl.x, e.y-pl.y); if (d < td) { td = d; target = e; } }
+
+  const melee = pl.cls === 'jeonsa' || pl.cls === 'soldier';
+  let mx = 0, my = 0, atk = false;
+  if (target && td < 700) {
+    const engageR = melee ? 65 : 230;
+    if (td > engageR) { mx = (target.x-pl.x)/td; my = (target.y-pl.y)/td; }
+    else if (!melee && td < engageR*.55) { mx = -(target.x-pl.x)/td; my = -(target.y-pl.y)/td; }
+    atk = td < 460;
+  } else {
+    const owner = players.get(pl.ownerId);
+    if (owner) { const od = Math.hypot(owner.x-pl.x, owner.y-pl.y)||1; if (od > 90) { mx=(owner.x-pl.x)/od; my=(owner.y-pl.y)/od; } }
+  }
+  pl.input.dx = mx; pl.input.dy = my; pl.input.atk = atk;
+
+  if (pl.cls === 'jeonsa') {
+    if (target && td < 260) charge(pl);
+    if (target && td < 140) frenzy(pl);
+  } else if (pl.cls === 'beomjok') {
+    if (!pl.transformed && target && td < 400) tigerForm(pl);
+    if (pl.transformed && target && td < 160) pounce(pl);
+  } else if (pl.cls === 'soldier') {
+    if (target && td < 100) thrust(pl);
+    if (pl.hp/pl.max < .5) { let near=0; for (const e of room.en) if (e.hp>0 && Math.hypot(e.x-pl.x,e.y-pl.y)<250) near++; if (near>=2) timeStop(pl); }
+  } else {
+    if (pl.souls > 0) summon(pl);
+    if (target && td < stat.fanR(pl)) salpuri(pl);
+  }
 }
 // 클라이언트가 localStorage에 들고 있던 "이어하기" 캐릭터 스냅샷을 검증해서 적용한다.
 // 이 게임은 서버가 세이브를 들고 있지 않으므로(재배포·슬립 때마다 날아감) 클라이언트를 신뢰하는 캐주얼 협동 프로토타입 전제를 그대로 따른다.
@@ -762,6 +816,7 @@ function tick() {
   for (const o of room.obs) { if (o.dying) o.rise -= DT*.8; else if (o.rise<1) o.rise = Math.min(1, o.rise+DT*.8); }
   room.obs = room.obs.filter(o => !(o.dying && o.rise <= 0));
 
+  for (const pl of players.values()) if (pl.isBot) tickBotAI(pl);
   for (const pl of players.values()) tickPlayer(pl);
 
   // 적 생성
@@ -906,7 +961,7 @@ function playerView(pl) {
     hp: Math.round(pl.hp), max: pl.max, lv: pl.lv, xp: Math.round(pl.xp), xpNeed: xpNeed(pl), oil: pl.oil, souls: pl.souls,
     maxSouls: stat.maxSouls(pl), fury: Math.round(pl.fury||0), maxFury: pl.cls==='jeonsa'?stat.maxFury(pl):0,
     frenzy: pl.frenzyT>0, ferocity: Math.round(pl.ferocity||0), maxFerocity: pl.cls==='beomjok'?stat.maxFerocity(pl):0,
-    transformed: !!pl.transformed, kills: pl.kills, alive: pl.alive, invFlicker: pl.invCd>0, up: pl.up };
+    transformed: !!pl.transformed, kills: pl.kills, alive: pl.alive, invFlicker: pl.invCd>0, up: pl.up, bot: !!pl.isBot };
 }
 function broadcastState() {
   // 파티가 전멸/승리해서 room이 끝난 상태면, 다시 시작할 때까지 무거운 배열은 안 보낸다(적 수십 마리를 매 틱 얼려서 보낼 이유가 없다).
@@ -929,9 +984,9 @@ function broadcastState() {
     events: room.events
   };
   const msg = JSON.stringify(state);
-  for (const pl of players.values()) if (pl.ws.readyState === 1) pl.ws.send(msg);
+  for (const pl of players.values()) if (pl.ws && pl.ws.readyState === 1) pl.ws.send(msg);
 }
-function sendTo(pl, obj) { if (pl.ws.readyState === 1) pl.ws.send(JSON.stringify(obj)); }
+function sendTo(pl, obj) { if (pl.ws && pl.ws.readyState === 1) pl.ws.send(JSON.stringify(obj)); }
 function pushInventory(pl) {
   sendTo(pl, { type:'inventory', eq: pl.eq, bag: pl.bag, G: pl.G, legends: pl.legends, oilTotal: pl.oilTotal });
 }
@@ -981,6 +1036,10 @@ wss.on('connection', ws => {
       if (msg.cls) setClass(pl, msg.cls);
       if (typeof msg.name === 'string' && msg.name.trim()) pl.name = msg.name.slice(0,12);
       if (msg.resume) applyResume(pl, msg.resume);
+      if (Array.isArray(msg.bots) && !pl.botsSpawned && players.size < MAX_PLAYERS) {
+        pl.botsSpawned = true;
+        for (const bc of msg.bots.slice(0, 3)) { if (players.size >= MAX_PLAYERS) break; spawnBot(pl.id, bc); }
+      }
       pushInventory(pl);
       sendTo(pl, { type:'classConfirm', cls: pl.cls });
     } else if (msg.type === 'restart') {
@@ -1019,7 +1078,11 @@ wss.on('connection', ws => {
       }
     }
   });
-  ws.on('close', () => { players.delete(id); console.log(`[leave] #${id} (현재 ${players.size}명)`); });
+  ws.on('close', () => {
+    players.delete(id);
+    for (const [bid, bp] of [...players.entries()]) if (bp.isBot && bp.ownerId === id) players.delete(bid);
+    console.log(`[leave] #${id} (현재 ${players.size}명)`);
+  });
 });
 
 setInterval(tick, TICK_MS);

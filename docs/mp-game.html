@@ -137,6 +137,12 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .clspick.sel{border-color:var(--gold);background:rgba(230,180,74,.12)}
 .clspick b{display:block;font-family:'Nanum Myeongjo',serif;font-size:16px;color:var(--gold);margin-bottom:2px}
 .clspick small{display:block;font-size:12px;color:var(--dim);line-height:1.5}
+#botPick{margin:14px 0 4px;text-align:left}
+.botHead{font-size:12px;color:var(--dim);margin-bottom:6px}
+.botSlots{display:flex;gap:8px}
+.botslot{flex:1;font:inherit;font-size:13px;color:var(--ink);background:rgba(0,0,0,.3);
+  border:2px solid var(--line);border-radius:10px;padding:9px 4px;cursor:pointer;text-align:center}
+.botslot.on{border-color:var(--gold);background:rgba(230,180,74,.12);color:var(--gold)}
 </style>
 </head>
 <body>
@@ -211,6 +217,14 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
       </div>
       <input id="nameInput" maxlength="12" placeholder="이름 (무당1 등 기본값)">
       <button class="go" id="goBtn">강하 시작</button>
+    </div>
+    <div id="botPick">
+      <div class="botHead">동료 (혼자 할 때 데려갈 AI, 최대 3명)</div>
+      <div class="botSlots">
+        <button class="botslot" data-slot="0">없음</button>
+        <button class="botslot" data-slot="1">없음</button>
+        <button class="botslot" data-slot="2">없음</button>
+      </div>
     </div>
     <div id="connMsg"></div>
   </div>
@@ -350,6 +364,8 @@ function genTiles(seed,trans){
 /* ───────── 네트워크 ───────── */
 const wsUrl=`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}`;
 let myCls='mudang', myTransformed=false;
+const BOT_CYCLE=['','mudang','jeonsa','beomjok','soldier'];
+let botChoices=['','',''];
 const SAVE_KEY='sinsi_save_v1', CLS_LABEL={mudang:'무당',jeonsa:'청동전사',beomjok:'범족사냥꾼',soldier:'손지안'};
 let charSave=null;
 function loadSave(){try{return JSON.parse(localStorage.getItem(SAVE_KEY));}catch{return null;}}
@@ -394,6 +410,8 @@ function sendName(){
   const nm=(el&&el.value.trim())||(charSave&&charSave.name)||'';
   const payload={type:'name',name:nm,cls:myCls};
   if(charSave)payload.resume={lv:charSave.lv,xp:charSave.xp,up:charSave.up,eq:charSave.eq,bag:charSave.bag,oilTotal:charSave.oilTotal,kills:charSave.kills};
+  const bots=botChoices.filter(Boolean);
+  if(bots.length)payload.bots=bots;
   ws.send(JSON.stringify(payload));
 }
 function connect(){
@@ -983,6 +1001,16 @@ for(const el of document.querySelectorAll('.clspick')){
     myCls=el.dataset.cls;
     document.querySelectorAll('.clspick').forEach(b=>b.classList.toggle('sel',b===el));
     applyClassUI();
+  });
+}
+for(const el of document.querySelectorAll('.botslot')){
+  el.addEventListener('click',()=>{
+    const i=+el.dataset.slot;
+    const cur=BOT_CYCLE.indexOf(botChoices[i]);
+    const cls=BOT_CYCLE[(cur+1)%BOT_CYCLE.length];
+    botChoices[i]=cls;
+    el.textContent=cls?CLS_LABEL[cls]:'없음';
+    el.classList.toggle('on',!!cls);
   });
 }
 $('goBtn').addEventListener('click',()=>{initAudio();sendName();if(state&&state.over)ws.send(JSON.stringify({type:'restart'}));$('screen').classList.add('hide');running=true;});
