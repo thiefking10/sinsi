@@ -103,9 +103,12 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 @media (orientation:portrait){.invbox{grid-template-columns:1fr}}
 .invbox h3{font-family:'Nanum Myeongjo',serif;font-weight:800;font-size:17px;margin:0 0 8px}
 #slots{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.slot{font:inherit;text-align:left;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:8px;padding:7px 9px;color:var(--ink);cursor:pointer;min-width:0}
+.slot{font:inherit;text-align:left;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:8px;padding:7px 9px;color:var(--ink);cursor:pointer;min-width:0;display:flex;align-items:center;gap:8px}
 .slot small{display:block;font-size:11px;color:var(--dim)}
 .slot span{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slotText{min-width:0;flex:1}
+.slotIcon{width:26px;height:26px;object-fit:contain;flex:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.cellIcon{width:30px;height:30px;object-fit:contain;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
 .slot.sel,.cell.sel{outline:2px solid var(--gold);outline-offset:1px}
 #sumStats{margin-top:10px;font-size:12px;line-height:1.7;color:var(--dim)}
 #sumStats .lg{color:#ff8a3a}
@@ -290,6 +293,12 @@ const SLOT_NAME_JEONSA={bell:'무기',fan:'방패',robe:'갑주',trinket:'노리
 const SLOT_NAME_BEOMJOK={bell:'발톱',fan:'덫',robe:'가죽옷',trinket:'노리개'};
 const SLOT_NAME_BY_CLS={jeonsa:SLOT_NAME_JEONSA,beomjok:SLOT_NAME_BEOMJOK,mudang:SLOT_NAME_MUDANG};
 const SLOT_NAME=new Proxy({},{get:(_,k)=>(SLOT_NAME_BY_CLS[myCls]||SLOT_NAME_MUDANG)[k]});
+const ICON_SRC_BY_CLS={
+  mudang:{bell:'assets/icons/mudang_bell.png',fan:'assets/icons/mudang_fan.png',robe:'assets/icons/mudang_robe.png',trinket:'assets/icons/trinket.png'},
+  jeonsa:{bell:'assets/icons/jeonsa_bell.png',fan:'assets/icons/jeonsa_fan.png',robe:'assets/icons/jeonsa_robe.png',trinket:'assets/icons/trinket.png'},
+  beomjok:{bell:'assets/icons/beomjok_bell.png',fan:'assets/icons/beomjok_fan.png',robe:null,trinket:'assets/icons/trinket.png'}
+};
+const ICON_SRC=new Proxy({},{get:(_,k)=>(ICON_SRC_BY_CLS[myCls]||ICON_SRC_BY_CLS.mudang)[k]});
 const SLOT_KEYS=['bell','fan','robe','trinket'];
 const BAG_MAX=12;
 const RAR=[{n:'일반',c:'#d8d2c2',salv:1},{n:'마법',c:'#6fa8ff',salv:2},{n:'희귀',c:'#f0d25a',salv:4},{n:'전설',c:'#ff8a3a',salv:8}];
@@ -386,7 +395,7 @@ function connect(){
 function handleEvent(e){
   if(e.type==='hit'){SFX[e.crit?'crit':'hit']();addTxt(e.x,e.y-e.r,e.crit?e.amt+'!':e.amt,e.crit?'#ffd35a':(e.curse?'#f0a8a0':'#efe4cc'),e.crit);}
   else if(e.type==='kill'){SFX.kill();burstParticles(e.x,e.y,ET[e.etype]?ET[e.etype].col:'#fff',e.boss?70:12,e.etype==='ghoul'?1:1.3);fx.push({type:'pop',x:e.x,y:e.y,r:ET[e.etype]?ET[e.etype].r:14,t:0,life:.25});}
-  else if(e.type==='bell'){SFX.bell();}
+  else if(e.type==='bell'){SFX.bell();fx.push({type:'burst',img:FX_SPR.bell,x:e.x,y:e.y,t:0,life:.4,max:80});}
   else if(e.type==='hurt'){if(e.id===myId){SFX.hurt();shake=Math.max(shake,.4);}addTxt(e.x,e.y-24,'-'+e.amt,'#e0625c',true);}
   else if(e.type==='down'){if(e.id===myId){toast('쓰러졌다');downSince=performance.now();}}
   else if(e.type==='rejoin'){if(e.id===myId)downSince=null;fx.push({type:'ring',x:e.x,y:e.y,t:0,life:.5,max:70,col:'230,180,74',thin:true});}
@@ -405,14 +414,14 @@ function handleEvent(e){
   else if(e.type==='rare'){SFX.rare();}
   else if(e.type==='pick'){if(e.id===myId){SFX.pick();addTxt(e.x,e.y-36,e.name,e.color,e.big);}}
   else if(e.type==='bagFull'){if(e.id===myId)toast('가방이 가득 찼다. 가방에서 분해하세요');}
-  else if(e.type==='slash'){SFX.slash();fx.push({type:'swipe',x:e.x,y:e.y,face:e.face,r:e.r,arc:e.arc,t:0,life:.16});}
-  else if(e.type==='charge'){SFX.dash();fx.push({type:'swipe',x:e.x,y:e.y,face:e.face,r:70,arc:.5,t:0,life:.2});}
+  else if(e.type==='slash'){SFX.slash();fx.push({type:'swipe',img:FX_SPR.slash,x:e.x,y:e.y,face:e.face,r:e.r,arc:e.arc,t:0,life:.16});}
+  else if(e.type==='charge'){SFX.dash();fx.push({type:'swipe',img:FX_SPR.slash,x:e.x,y:e.y,face:e.face,r:70,arc:.5,t:0,life:.2});}
   else if(e.type==='frenzy'){SFX.frenzy();shake=Math.max(shake,.3);fx.push({type:'ring',x:e.x,y:e.y,t:0,life:.5,max:95,col:'217,106,74',thin:true});}
   else if(e.type==='dart'){SFX.dart();}
-  else if(e.type==='claw'){SFX.claw();fx.push({type:'swipe',x:e.x,y:e.y,face:e.face,r:62,arc:.55,t:0,life:.13});}
+  else if(e.type==='claw'){SFX.claw();fx.push({type:'swipe',img:FX_SPR.claw,x:e.x,y:e.y,face:e.face,r:62,arc:.55,t:0,life:.13});}
   else if(e.type==='beastform'){SFX.transform();shake=Math.max(shake,.35);fx.push({type:'ring',x:e.x,y:e.y,t:0,life:.5,max:80,col:'201,134,46',thin:false});}
   else if(e.type==='detransform'){fx.push({type:'ring',x:e.x,y:e.y,t:0,life:.35,max:60,col:'201,134,46',thin:true});}
-  else if(e.type==='pounce'){SFX.pounce();fx.push({type:'swipe',x:e.x,y:e.y,face:e.face,r:90,arc:.7,t:0,life:.18});}
+  else if(e.type==='pounce'){SFX.pounce();fx.push({type:'swipe',img:FX_SPR.claw,x:e.x,y:e.y,face:e.face,r:90,arc:.7,t:0,life:.18});}
 }
 
 /* ───────── 입력 ───────── */
@@ -478,7 +487,8 @@ function renderInv(){
   const sl=$('slots');sl.innerHTML='';
   for(const k of SLOT_KEYS){const it=myInv.eq[k];const b=document.createElement('button');
     b.className='slot'+(invSel&&invSel.from==='eq'&&invSel.slot===k?' sel':'');
-    b.innerHTML=`<small>${SLOT_NAME[k]}</small><span style="color:${it?RAR[it.r].c:'var(--dim)'}">${it?it.name:'비어 있음'}</span>`;
+    const ic=ICON_SRC[k];
+    b.innerHTML=(ic?`<img src="${ic}" class="slotIcon" alt="">`:'')+`<div class="slotText"><small>${SLOT_NAME[k]}</small><span style="color:${it?RAR[it.r].c:'var(--dim)'}">${it?it.name:'비어 있음'}</span></div>`;
     b.onclick=()=>{invSel=it?{from:'eq',slot:k}:null;renderInv();};sl.appendChild(b);}
   const G=myInv.G;let st='';
   for(const k in AFF)if(G[k])st+=`<div>${AFF[k].l} +${fmtV(k,G[k])}${AFF[k].u}</div>`;
@@ -489,7 +499,8 @@ function renderInv(){
   for(let i=0;i<BAG_MAX;i++){const it=myInv.bag[i];const c=document.createElement('button');
     c.className='cell'+(invSel&&invSel.from==='bag'&&invSel.i===i?' sel':'');
     if(it){c.style.borderColor=RAR[it.r].c;
-      c.innerHTML=`<span style="color:${RAR[it.r].c}">${SLOT_NAME[it.slot][0]}</span>${isUpgrade(it)?'<i>▲</i>':''}`;
+      const ic=ICON_SRC[it.slot];
+      c.innerHTML=(ic?`<img src="${ic}" class="cellIcon" alt="">`:`<span style="color:${RAR[it.r].c}">${SLOT_NAME[it.slot][0]}</span>`)+`${isUpgrade(it)?'<i>▲</i>':''}`;
       c.onclick=()=>{invSel={from:'bag',i};renderInv();};}
     else c.disabled=true;
     bg.appendChild(c);}
@@ -552,8 +563,15 @@ function drawEnemy(e){
   }
   const c=e.flash?'#ffffff':ET[e.type].col, r=e.r;
   g.fillStyle='rgba(0,0,0,.35)';g.beginPath();g.ellipse(e.x,e.y+r*.7,r,r*.4,0,0,6.28);g.fill();
+  let sdrawn=false;
+  if(ENEMY_SPRITES[e.type]&&!e.flash){
+    let fa=Math.PI/2;
+    if(e.type==='charger')fa=e.state==='chase'?Math.atan2((e.ty||e.y)-e.y,(e.tx||e.x)-e.x):Math.atan2(e.dy,e.dx);
+    sdrawn=drawSprite(ENEMY_SPRITES[e.type],e.x,e.y,fa,r*3.1);
+  }
   g.fillStyle=c;
-  if(e.type==='ghoul'){
+  if(sdrawn){}
+  else if(e.type==='ghoul'){
     g.globalAlpha=.88;g.beginPath();g.arc(e.x,e.y-2,r*.92,Math.PI,0);
     for(let k=0;k<=6;k++){const jag=(k%2?1:-1)*2.6;g.lineTo(e.x+r*.92-k*r*.92*2/6,e.y+r*.7+jag+Math.sin(e.wob+k)*2.5);}
     g.closePath();g.fill();g.globalAlpha=1;
@@ -615,6 +633,22 @@ for(const [key,file] of Object.entries({mudang:'mudang.png',jeonsa:'jeonsa.png',
   img.src = 'assets/sprites/'+file;
   img.decode ? img.decode().then(()=>img.decoded=true).catch(()=>{}) : (img.onload=()=>img.decoded=true);
   SPRITES[key] = img;
+}
+const ENEMY_SPRITES = {};
+for(const [key,file] of Object.entries({ghoul:'ghoul.png',charger:'charger.png',spitter:'spitter.png',mutant:'mutant.png',bomber:'bomber.png',husk:'husk.png',boss:'boss.png'})){
+  const img = new Image();
+  img.decoded = false;
+  img.src = 'assets/sprites/'+file;
+  img.decode ? img.decode().then(()=>img.decoded=true).catch(()=>{}) : (img.onload=()=>img.decoded=true);
+  ENEMY_SPRITES[key] = img;
+}
+const FX_SPR = {};
+for(const [key,file] of Object.entries({bell:'bell_wave.png',slash:'sword_slash.png',claw:'claw_slash.png'})){
+  const img = new Image();
+  img.decoded = false;
+  img.src = 'assets/fx/'+file;
+  img.decode ? img.decode().then(()=>img.decoded=true).catch(()=>{}) : (img.onload=()=>img.decoded=true);
+  FX_SPR[key] = img;
 }
 function drawSprite(img, fx2, fy, fa, size){
   if(!img.decoded) return false;
@@ -785,8 +819,17 @@ function render(dt){
       g.beginPath();g.moveTo(f.x,f.y);g.arc(f.x,f.y,f.r*Math.min(1,k*1.6),a,a+.45);g.closePath();g.fill();}}
     else if(f.type==='shock'){g.strokeStyle=`rgba(196,138,60,${(1-k)*.9})`;g.lineWidth=10;g.beginPath();g.arc(f.x,f.y,f.max*k,0,6.28);g.stroke();}
     else if(f.type==='pop'){g.strokeStyle=`rgba(255,255,255,${(1-k)*.9})`;g.lineWidth=3*(1-k)+1;g.beginPath();g.arc(f.x,f.y,f.r*(1+k*1.4),0,6.28);g.stroke();}
-    else if(f.type==='swipe'){g.strokeStyle=`rgba(230,210,180,${(1-k)*.85})`;g.lineWidth=6*(1-k)+2;
-      g.beginPath();g.arc(f.x,f.y,f.r*(0.4+k*.6),f.face-f.arc/2,f.face+f.arc/2);g.stroke();}
+    else if(f.type==='swipe'){
+      if(f.img&&f.img.decoded){
+        const s=f.r*2.3,cx=f.x+Math.cos(f.face)*f.r*.5,cy=f.y+Math.sin(f.face)*f.r*.5;
+        g.save();g.globalAlpha=1-k*.85;g.translate(cx,cy);g.rotate(f.face);g.drawImage(f.img,-s/2,-s/2,s,s);g.restore();
+      }else{g.strokeStyle=`rgba(230,210,180,${(1-k)*.85})`;g.lineWidth=6*(1-k)+2;
+        g.beginPath();g.arc(f.x,f.y,f.r*(0.4+k*.6),f.face-f.arc/2,f.face+f.arc/2);g.stroke();}}
+    else if(f.type==='burst'){
+      if(f.img&&f.img.decoded){
+        const s=f.max*(0.6+k*1.1);
+        g.save();g.globalAlpha=1-k;g.translate(f.x,f.y);g.rotate(k*1.2);g.drawImage(f.img,-s/2,-s/2,s,s);g.restore();
+      }else{g.strokeStyle=`rgba(230,180,74,${(1-k)*.8})`;g.lineWidth=4;g.beginPath();g.arc(f.x,f.y,f.max*k,0,6.28);g.stroke();}}
     else if(f.type==='p'){g.fillStyle=f.col;g.globalAlpha=1-k;g.beginPath();g.arc(f.x,f.y,f.r,0,6.28);g.fill();g.globalAlpha=1;}}
   g.textAlign='center';
   for(const t of txt){g.globalAlpha=1-t.t/t.life;g.fillStyle=t.col;
