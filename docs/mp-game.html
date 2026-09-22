@@ -205,6 +205,9 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
         <button class="clspick" id="clsBeomjok" data-cls="beomjok">
           <b>범족사냥꾼</b><small>평소엔 발톱을 던져 피를 흘리게 하고, 변신하면 빠르고 사나운 근접 맹수가 된다.</small>
         </button>
+        <button class="clspick" id="clsSoldier" data-cls="soldier">
+          <b>손지안</b><small>언월도로 근접 베기와 원거리 테이저를 함께 쓴다. 감전시킨 적을 찌르기로 마무리한다.</small>
+        </button>
       </div>
       <input id="nameInput" maxlength="12" placeholder="이름 (무당1 등 기본값)">
       <button class="go" id="goBtn">강하 시작</button>
@@ -297,12 +300,14 @@ const STAGE_COL=['#efe4cc','#d9c08e','#7cc2b0','#e07a6a','#e05548'];
 const SLOT_NAME_MUDANG={bell:'방울',fan:'부채',robe:'무복',trinket:'노리개'};
 const SLOT_NAME_JEONSA={bell:'무기',fan:'방패',robe:'갑주',trinket:'노리개'};
 const SLOT_NAME_BEOMJOK={bell:'발톱',fan:'덫',robe:'가죽옷',trinket:'노리개'};
-const SLOT_NAME_BY_CLS={jeonsa:SLOT_NAME_JEONSA,beomjok:SLOT_NAME_BEOMJOK,mudang:SLOT_NAME_MUDANG};
+const SLOT_NAME_SOLDIER={bell:'언월도',fan:'전극',robe:'방탄복',trinket:'노리개'};
+const SLOT_NAME_BY_CLS={jeonsa:SLOT_NAME_JEONSA,beomjok:SLOT_NAME_BEOMJOK,mudang:SLOT_NAME_MUDANG,soldier:SLOT_NAME_SOLDIER};
 const SLOT_NAME=new Proxy({},{get:(_,k)=>(SLOT_NAME_BY_CLS[myCls]||SLOT_NAME_MUDANG)[k]});
 const ICON_SRC_BY_CLS={
   mudang:{bell:'assets/icons/mudang_bell.png',fan:'assets/icons/mudang_fan.png',robe:'assets/icons/mudang_robe.png',trinket:'assets/icons/trinket.png'},
   jeonsa:{bell:'assets/icons/jeonsa_bell.png',fan:'assets/icons/jeonsa_fan.png',robe:'assets/icons/jeonsa_robe.png',trinket:'assets/icons/trinket.png'},
-  beomjok:{bell:'assets/icons/beomjok_bell.png',fan:'assets/icons/beomjok_fan.png',robe:null,trinket:'assets/icons/trinket.png'}
+  beomjok:{bell:'assets/icons/beomjok_bell.png',fan:'assets/icons/beomjok_fan.png',robe:null,trinket:'assets/icons/trinket.png'},
+  soldier:{bell:null,fan:null,robe:null,trinket:'assets/icons/trinket.png'}
 };
 const ICON_SRC=new Proxy({},{get:(_,k)=>(ICON_SRC_BY_CLS[myCls]||ICON_SRC_BY_CLS.mudang)[k]});
 const SLOT_KEYS=['bell','fan','robe','trinket'];
@@ -345,7 +350,7 @@ function genTiles(seed,trans){
 /* ───────── 네트워크 ───────── */
 const wsUrl=`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}`;
 let myCls='mudang', myTransformed=false;
-const SAVE_KEY='sinsi_save_v1', CLS_LABEL={mudang:'무당',jeonsa:'청동전사',beomjok:'범족사냥꾼'};
+const SAVE_KEY='sinsi_save_v1', CLS_LABEL={mudang:'무당',jeonsa:'청동전사',beomjok:'범족사냥꾼',soldier:'손지안'};
 let charSave=null;
 function loadSave(){try{return JSON.parse(localStorage.getItem(SAVE_KEY));}catch{return null;}}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch{}charSave=null;}
@@ -361,10 +366,10 @@ function saveChar(){
   try{localStorage.setItem(SAVE_KEY,JSON.stringify(snap));}catch{}
 }
 function applyClassUI(){
-  const jeonsa=myCls==='jeonsa', beomjok=myCls==='beomjok';
+  const jeonsa=myCls==='jeonsa', beomjok=myCls==='beomjok', soldier=myCls==='soldier';
   $('furyRow').style.display=jeonsa?'flex':'none';
   $('feroRow').style.display=beomjok?'flex':'none';
-  const soulCt=$('soulCt'); if(soulCt)soulCt.style.display=(jeonsa||beomjok)?'none':'block';
+  const soulCt=$('soulCt'); if(soulCt)soulCt.style.display=(jeonsa||beomjok||soldier)?'none':'block';
   if(jeonsa){
     $('bSum').querySelector('span').textContent='돌진';
     $('bSal').querySelector('span').textContent='광란';
@@ -373,6 +378,10 @@ function applyClassUI(){
     $('bSum').querySelector('span').textContent='변신';
     $('bSal').querySelector('span').textContent='도약';
     $('bAtk').querySelector('span').textContent=myTransformed?'발톱':'사냥';
+  }else if(soldier){
+    $('bSum').querySelector('span').textContent='테이저';
+    $('bSal').querySelector('span').textContent='찌르기';
+    $('bAtk').querySelector('span').textContent='베기';
   }else{
     $('bSum').querySelector('span').textContent='초혼';
     $('bSal').querySelector('span').textContent='살풀이';
@@ -388,10 +397,10 @@ function sendName(){
   ws.send(JSON.stringify(payload));
 }
 function connect(){
-  $('connMsg').textContent='서버에 접속 중...';
+  const cm=$('connMsg');if(cm)cm.textContent='서버에 접속 중...'; // 죽은 뒤 게임오버 화면이 #card 내용을 통째로 바꿔서 connMsg가 사라진 뒤일 수 있다
   ws=new WebSocket(wsUrl);
-  ws.onopen=()=>{$('connMsg').textContent='접속됨';};
-  ws.onclose=()=>{$('connMsg').textContent='연결이 끊겼습니다. 재접속 중...';setTimeout(connect,2000);};
+  ws.onopen=()=>{const el=$('connMsg');if(el)el.textContent='접속됨';};
+  ws.onclose=()=>{const el=$('connMsg');if(el)el.textContent='연결이 끊겼습니다. 재접속 중...';setTimeout(connect,2000);};
   ws.onerror=()=>{};
   ws.onmessage=ev=>{
     const m=JSON.parse(ev.data);
@@ -413,7 +422,7 @@ function connect(){
       if($('inv').classList.contains('show'))renderInv();
       saveChar();
     }else if(m.type==='full'){
-      $('connMsg').textContent='서버가 가득 찼습니다.';
+      const fm=$('connMsg');if(fm)fm.textContent='서버가 가득 찼습니다.';
     }
   };
 }
@@ -447,6 +456,8 @@ function handleEvent(e){
   else if(e.type==='beastform'){SFX.transform();shake=Math.max(shake,.35);fx.push({type:'ring',x:e.x,y:e.y,t:0,life:.5,max:80,col:'201,134,46',thin:false});}
   else if(e.type==='detransform'){fx.push({type:'ring',x:e.x,y:e.y,t:0,life:.35,max:60,col:'201,134,46',thin:true});}
   else if(e.type==='pounce'){SFX.pounce();fx.push({type:'swipe',img:FX_SPR.claw,x:e.x,y:e.y,face:e.face,r:90,arc:.7,t:0,life:.18});}
+  else if(e.type==='taser'){SFX.zap();}
+  else if(e.type==='thrust'){SFX.dash();shake=Math.max(shake,.2);fx.push({type:'swipe',img:FX_SPR.slash,x:e.x,y:e.y,face:e.face,r:100,arc:.35,t:0,life:.16});}
 }
 
 /* ───────── 입력 ───────── */
@@ -641,6 +652,8 @@ function drawEnemy(e){
   }
   if(e.curse){g.strokeStyle='rgba(240,120,110,.8)';g.lineWidth=2;g.setLineDash([4,4]);g.beginPath();g.arc(e.x,e.y,r+6,0,6.28);g.stroke();g.setLineDash([]);}
   if(e.bleed){g.fillStyle='rgba(194,65,58,.85)';for(let k=0;k<3;k++){const a=k*2.1+e.wob;g.beginPath();g.arc(e.x+Math.cos(a)*(r+4),e.y+Math.sin(a)*(r+4),1.6,0,6.28);g.fill();}}
+  if(e.shock){g.strokeStyle='rgba(120,200,255,.9)';g.lineWidth=1.6;for(let k=0;k<3;k++){const a=k*2.4+e.wob*1.7,rr=r+5;
+    g.beginPath();g.moveTo(e.x+Math.cos(a)*rr,e.y+Math.sin(a)*rr);g.lineTo(e.x+Math.cos(a+.5)*(rr-3),e.y+Math.sin(a+.5)*(rr-3));g.lineTo(e.x+Math.cos(a+1)*rr,e.y+Math.sin(a+1)*rr);g.stroke();}}
   if(e.type!=='boss'&&e.hp<e.max&&e.hp>0){g.fillStyle='rgba(0,0,0,.6)';g.fillRect(e.x-r,e.y-r-9,r*2,4);
     g.fillStyle='#c2413c';g.fillRect(e.x-r,e.y-r-9,r*2*Math.max(0,e.hp/e.max),4);}
 }
@@ -652,7 +665,7 @@ function drawSpirit(s){
   g.globalAlpha=1;
 }
 const SPRITES = {};
-for(const [key,file] of Object.entries({mudang:'mudang.png',jeonsa:'jeonsa.png',beomjok_hunter:'beomjok_hunter.png',beomjok_tiger:'beomjok_tiger.png'})){
+for(const [key,file] of Object.entries({mudang:'mudang.png',jeonsa:'jeonsa.png',beomjok_hunter:'beomjok_hunter.png',beomjok_tiger:'beomjok_tiger.png',soldier:'soldier.png'})){
   const img = new Image();
   img.decoded = false;
   img.src = 'assets/sprites/'+file;
@@ -693,10 +706,12 @@ function drawPlayer(p){
   let drawn=false;
   if(p.cls==='jeonsa') drawn=drawSprite(SPRITES.jeonsa,fx2,fy,fa,72);
   else if(p.cls==='beomjok') drawn=drawSprite(p.transformed?SPRITES.beomjok_tiger:SPRITES.beomjok_hunter,fx2,fy,fa,p.transformed?80:72);
+  else if(p.cls==='soldier') drawn=drawSprite(SPRITES.soldier,fx2,fy,fa,72);
   else drawn=drawSprite(SPRITES.mudang,fx2,fy,fa,72);
   if(!drawn){
     if(p.cls==='jeonsa')drawJeonsa(p,fx2,fy,fa,sw);
     else if(p.cls==='beomjok')drawBeomjok(p,fx2,fy,fa,sw);
+    else if(p.cls==='soldier')drawSoldier(p,fx2,fy,fa,sw);
     else drawMudang(p,fx2,fy,fa,sw);
   }
   g.fillStyle=p.id===myId?'#e6b44a':'#efe4cc';g.font='12px "Gowun Dodum", sans-serif';g.textAlign='center';
@@ -780,6 +795,31 @@ function drawBeomjokTiger(p,fx2,fy,fa,sw){
   g.fillStyle='#ffd35a';g.beginPath();g.arc(bl*1.1,-bw*.22,1.6,0,6.28);g.arc(bl*1.1,bw*.22,1.6,0,6.28);g.fill();
   g.restore();
 }
+function drawSoldier(p,fx2,fy,fa,sw){
+  // 손지안: 각진 전술 방탄복, 손에 든 긴 언월도 끝에 테이저 전극(푸른 스파크)
+  g.fillStyle='#33392e';g.beginPath();g.ellipse(fx2,fy+2,11,13,0,0,6.28);g.fill();
+  g.fillStyle='#5a6248';
+  g.beginPath();g.moveTo(fx2-10,fy-6);g.lineTo(fx2+10,fy-6);g.lineTo(fx2+8.5,fy+13);g.lineTo(fx2-8.5,fy+13);g.closePath();g.fill();
+  g.fillStyle='#3a4030';g.fillRect(fx2-8.5,fy-3,17,4.5);
+  g.fillStyle=p.color;g.beginPath();g.ellipse(fx2,fy-1,3.6,5.5,0,0,6.28);g.fill();
+  g.fillStyle='#6b6350';
+  g.beginPath();g.ellipse(fx2-Math.cos(fa)*5,fy-3+sw*.2,5,7,fa,0,6.28);g.fill();
+  const hx=fx2+Math.cos(fa)*11,hy=fy-2+Math.sin(fa)*5;
+  g.beginPath();g.ellipse(hx,hy,5.4,7.6,fa,0,6.28);g.fill();
+  const tx=fx2+Math.cos(fa)*30,ty=fy+Math.sin(fa)*30-4;
+  g.strokeStyle='#7a6b4a';g.lineWidth=3;g.lineCap='round';
+  g.beginPath();g.moveTo(hx,hy);g.lineTo(tx,ty);g.stroke();
+  const perp=fa+Math.PI/2;
+  g.fillStyle='#8a7a52';
+  g.beginPath();g.moveTo(tx,ty);g.lineTo(tx+Math.cos(fa)*10+Math.cos(perp)*6,ty+Math.sin(fa)*10+Math.sin(perp)*6);g.lineTo(tx+Math.cos(fa)*10-Math.cos(perp)*3,ty+Math.sin(fa)*10-Math.sin(perp)*3);g.closePath();g.fill();
+  g.fillStyle=Math.sin(state.t*20)>0?'#bfe8ff':'#4ea8e6';
+  g.beginPath();g.arc(tx+Math.cos(fa)*4,ty+Math.sin(fa)*4,2.2,0,6.28);g.fill();
+  g.fillStyle='#f4ecdc';g.beginPath();g.arc(fx2,fy-15,7.3,0,6.28);g.fill();
+  g.fillStyle='#241a16';g.beginPath();g.ellipse(fx2,fy-19,8.6,2.2,0,0,6.28);g.fill();
+  g.beginPath();g.moveTo(fx2-4,fy-19);g.lineTo(fx2,fy-27);g.lineTo(fx2+4,fy-19);g.closePath();g.fill();
+  g.strokeStyle='#241a16';g.lineWidth=1.4;
+  g.beginPath();g.ellipse(fx2-2.6,fy-15,3,2.2,0,0,6.28);g.ellipse(fx2+2.6,fy-15,3,2.2,0,0,6.28);g.stroke();
+}
 function updFx(dt){
   for(const f of fx){f.t+=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.9;f.vy*=.9;}}
   for(let i=fx.length-1;i>=0;i--)if(fx[i].t>=fx[i].life)fx.splice(i,1);
@@ -835,7 +875,7 @@ function render(dt){
   for(const q of state.eproj){g.fillStyle='rgba(180,110,230,.35)';g.beginPath();g.arc(q.x,q.y,q.r*2,0,6.28);g.fill();
     g.fillStyle='#d8a8ff';g.beginPath();g.arc(q.x,q.y,q.r,0,6.28);g.fill();}
   for(const pr of state.proj){const a=Math.atan2(pr.vy,pr.vx);
-    g.strokeStyle='rgba(230,180,74,.8)';g.lineWidth=3;
+    g.strokeStyle=pr.kind==='taser'?'rgba(120,200,255,.85)':'rgba(230,180,74,.8)';g.lineWidth=3;
     for(let w=0;w<3;w++){g.beginPath();g.arc(pr.x-Math.cos(a)*w*7,pr.y-Math.sin(a)*w*7,7+w*3,a-.9,a+.9);g.stroke();}}
 
   for(const f of fx){const k=f.t/f.life;
@@ -897,12 +937,14 @@ function updHud(){
       $('feroLabel').textContent=me.transformed?'야성 (변신 중)':'야성';
       $('bSum').classList.toggle('off',false);
       if(me.transformed!==myTransformed){myTransformed=me.transformed;applyClassUI();}
+    }else if(me.cls==='soldier'){
+      $('bSum').classList.toggle('off',false);
     }else{
       $('soulCt').textContent='넋 '+me.souls+'/'+me.maxSouls;
       $('bSum').classList.toggle('off',me.souls<=0);
     }
   }
-  const CLS_LABEL={mudang:'무당 ',jeonsa:'전사 ',beomjok:'사냥꾼 '};
+  const CLS_LABEL={mudang:'무당 ',jeonsa:'전사 ',beomjok:'사냥꾼 ',soldier:'손지안 '};
   $('party').innerHTML=state.players.map(p=>`
     <div class="pmem${p.alive?'':' down'}">
       <div class="pname"><span style="color:${p.color}">${p.id===myId?'★ ':''}${p.name}</span><small>${p.alive?(CLS_LABEL[p.cls]||'')+'Lv'+p.lv:'쓰러짐'}</small></div>

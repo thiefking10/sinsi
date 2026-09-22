@@ -90,7 +90,24 @@ const UP_BEOMJOK = [
 ];
 const UP_BEOMJOK_BY = {}; UP_BEOMJOK.forEach(u => UP_BEOMJOK_BY[u.id] = u);
 
-const UP_OF = pl => pl.cls === 'jeonsa' ? UP_JEONSA : pl.cls === 'beomjok' ? UP_BEOMJOK : UP;
+const UP_SOLDIER = [
+  { id:'wideglaive', name:'넓은 베기',   max:3, desc:l=>`언월도 사거리·범위가 ${15*(l+1)}% 넓어진다` },
+  { id:'swiftglaive',name:'빠른 손',     max:4, desc:()=>'베기를 15% 더 빨리 휘두른다' },
+  { id:'heavyglaive',name:'짓누르는 일격', max:3, desc:()=>'베기 피해 +20%' },
+  { id:'taserdmg',   name:'고압 전극',   max:3, desc:()=>'테이저 피해 +20%' },
+  { id:'taserheat',  name:'냉각 개선',   max:3, desc:()=>'테이저 대기시간 −15%' },
+  { id:'shocklong',  name:'긴 감전',     max:3, desc:()=>'감전 지속시간 +0.5초' },
+  { id:'thrustdmg',  name:'꿰뚫는 찌르기', max:3, desc:()=>'찌르기 피해 +25%' },
+  { id:'thrustcd',   name:'재정비',      max:2, desc:()=>'찌르기 대기시간 −20%' },
+  { id:'execbonus',  name:'감전 처형',   max:2, desc:()=>'감전된 적에게 찌르기 피해 보너스가 더 커진다' },
+  { id:'fieldheal',  name:'전장 응급처치', max:2, desc:()=>'베기가 적중하면 가끔 체력을 되찾는다' },
+  { id:'tacarmor',   name:'전술 장갑',   max:3, desc:()=>'받는 피해 −7%' },
+  { id:'svital',     name:'손지안의 가호', max:3, desc:()=>'최대 체력 +28, 체력을 모두 되찾는다' },
+  { id:'fieldsense', name:'전장 감각',   max:2, desc:()=>'신수를 더 멀리서 끌어오고 더 자주 줍는다' }
+];
+const UP_SOLDIER_BY = {}; UP_SOLDIER.forEach(u => UP_SOLDIER_BY[u.id] = u);
+
+const UP_OF = pl => pl.cls === 'jeonsa' ? UP_JEONSA : pl.cls === 'beomjok' ? UP_BEOMJOK : pl.cls === 'soldier' ? UP_SOLDIER : UP;
 
 /* ───────── 아이템 ───────── */
 const SLOT_NAME = { bell:'방울', fan:'부채', robe:'무복', trinket:'노리개' };
@@ -137,18 +154,24 @@ const BASE_BY_CLS = {
     fan:{names:['나무 덫','뼈 덫','문양 덫','신령 덫'],imp:'fanR'},
     robe:{names:['거친 가죽옷','짐승 가죽옷','무늬 가죽옷','신령 가죽옷'],imp:'hp'},
     trinket:{names:['나무 노리개','옥 노리개','산호 노리개','신령 노리개'],imp:'crit'}
+  },
+  soldier: {
+    bell:{names:['낡은 언월도','벼려진 언월도','문양 언월도','신령 언월도'],imp:'bellDmg'},
+    fan:{names:['녹슨 전극','충전된 전극','정제된 전극','신령 전극'],imp:'fanR'},
+    robe:{names:['낡은 방탄복','보강 방탄복','문양 방탄복','신령 방탄복'],imp:'hp'},
+    trinket:{names:['나무 노리개','옥 노리개','산호 노리개','신령 노리개'],imp:'crit'}
   }
 };
 const BASE = BASE_BY_CLS.mudang; // 드랍 시 수치를 굴릴 때 임시로 쓰는 기본형(줍는 순간 다시 이름 붙임)
 const LEG = [
-  {id:'thunder',slot:'bell',names:{mudang:'천둥 방울',jeonsa:'천둥 동검',beomjok:'천둥 발톱'},desc:'방울이 적중하면 20% 확률로 번개가 세 명에게 튄다'},
-  {id:'soulbell',slot:'bell',names:{mudang:'넋부름 방울',jeonsa:'넋부름 동검',beomjok:'넋부름 발톱'},desc:'방울로 쓰러뜨린 적은 넋을 하나 더 남긴다'},
-  {id:'maple',slot:'fan',names:{mudang:'핏빛 단풍 부채',jeonsa:'핏빛 단풍 방패',beomjok:'핏빛 단풍 덫'},desc:'살풀이에 걸린 적은 저주가 끝날 때까지 불탄다'},
-  {id:'wind',slot:'fan',names:{mudang:'풍백의 부채',jeonsa:'풍백의 방패',beomjok:'풍백의 덫'},desc:'살풀이가 적을 멀리 날려 보내고, 대기 시간 −30%'},
-  {id:'obang',slot:'robe',names:{mudang:'오방신장 무복',jeonsa:'오방신장 갑주',beomjok:'오방신장 가죽옷'},desc:'피해를 받으면 원혼 둘이 곁에 나타난다 (3초마다)'},
-  {id:'tiger',slot:'robe',names:{mudang:'범가죽 무복',jeonsa:'범가죽 갑주',beomjok:'범가죽 가죽옷'},desc:'체력이 30% 이하일 때 모든 피해 +60%'},
-  {id:'shackle',slot:'trinket',names:{mudang:'찢긴 족쇄',jeonsa:'찢긴 족쇄',beomjok:'찢긴 족쇄'},desc:'저주 걸린 적이 쓰러지면 터져 주변을 태운다'},
-  {id:'brow',slot:'trinket',names:{mudang:'동두의 이마쇠',jeonsa:'동두의 이마쇠',beomjok:'동두의 이마쇠'},desc:'원혼 수가 절반이 되는 대신 거대해져 피해 +120%'}
+  {id:'thunder',slot:'bell',names:{mudang:'천둥 방울',jeonsa:'천둥 동검',beomjok:'천둥 발톱',soldier:'천둥 언월도'},desc:'방울이 적중하면 20% 확률로 번개가 세 명에게 튄다'},
+  {id:'soulbell',slot:'bell',names:{mudang:'넋부름 방울',jeonsa:'넋부름 동검',beomjok:'넋부름 발톱',soldier:'넋부름 언월도'},desc:'방울로 쓰러뜨린 적은 넋을 하나 더 남긴다'},
+  {id:'maple',slot:'fan',names:{mudang:'핏빛 단풍 부채',jeonsa:'핏빛 단풍 방패',beomjok:'핏빛 단풍 덫',soldier:'핏빛 단풍 전극'},desc:'살풀이에 걸린 적은 저주가 끝날 때까지 불탄다'},
+  {id:'wind',slot:'fan',names:{mudang:'풍백의 부채',jeonsa:'풍백의 방패',beomjok:'풍백의 덫',soldier:'풍백의 전극'},desc:'살풀이가 적을 멀리 날려 보내고, 대기 시간 −30%'},
+  {id:'obang',slot:'robe',names:{mudang:'오방신장 무복',jeonsa:'오방신장 갑주',beomjok:'오방신장 가죽옷',soldier:'오방신장 방탄복'},desc:'피해를 받으면 원혼 둘이 곁에 나타난다 (3초마다)'},
+  {id:'tiger',slot:'robe',names:{mudang:'범가죽 무복',jeonsa:'범가죽 갑주',beomjok:'범가죽 가죽옷',soldier:'범가죽 방탄복'},desc:'체력이 30% 이하일 때 모든 피해 +60%'},
+  {id:'shackle',slot:'trinket',names:{mudang:'찢긴 족쇄',jeonsa:'찢긴 족쇄',beomjok:'찢긴 족쇄',soldier:'찢긴 족쇄'},desc:'저주 걸린 적이 쓰러지면 터져 주변을 태운다'},
+  {id:'brow',slot:'trinket',names:{mudang:'동두의 이마쇠',jeonsa:'동두의 이마쇠',beomjok:'동두의 이마쇠',soldier:'동두의 이마쇠'},desc:'원혼 수가 절반이 되는 대신 거대해져 피해 +120%'}
 ];
 const LEG_BY = {}; LEG.forEach(l => LEG_BY[l.id] = l);
 // 아이템은 슬롯·수치·희귀도만 들고 있고, 표시용 이름은 줍는 사람의 직업에 맞춰 이 함수로 다시 붙인다.
@@ -211,7 +234,7 @@ const stat = {
   magnet: pl => 95 * (1 + .6 * L(pl,'sense')),
   dropMul: pl => (1 + .3 * L(pl,'sense')) * (1 + (pl.G.oil||0)/100),
   speed: pl => {
-    const base = pl.cls === 'jeonsa' ? 155 : pl.cls === 'beomjok' ? 200 : 185;
+    const base = pl.cls === 'jeonsa' ? 155 : pl.cls === 'beomjok' ? 200 : pl.cls === 'soldier' ? 165 : 185;
     const rageBonus = pl.cls === 'jeonsa' && L(pl,'rageSpeed') && pl.fury >= stat.maxFury(pl)/2 ? .15 : 0;
     const primeBonus = pl.cls === 'beomjok' ? .12*L(pl,'primeSpeed') : 0;
     const transBonus = pl.cls === 'beomjok' && pl.transformed ? .4 : 0;
@@ -219,8 +242,8 @@ const stat = {
   },
   crit: pl => .15 + (pl.G.crit||0)/100, critMul: pl => 2 + (pl.G.critDmg||0)/100,
   maxHp: pl => {
-    const base = pl.cls === 'jeonsa' ? 150 : pl.cls === 'beomjok' ? 90 : 100;
-    const vitalUp = pl.cls === 'jeonsa' ? 30*L(pl,'jvital') : pl.cls === 'beomjok' ? 25*L(pl,'bvital') : 25*L(pl,'vital');
+    const base = pl.cls === 'jeonsa' ? 150 : pl.cls === 'beomjok' ? 90 : pl.cls === 'soldier' ? 120 : 100;
+    const vitalUp = pl.cls === 'jeonsa' ? 30*L(pl,'jvital') : pl.cls === 'beomjok' ? 25*L(pl,'bvital') : pl.cls === 'soldier' ? 28*L(pl,'svital') : 25*L(pl,'vital');
     return Math.round(base + vitalUp + (pl.G.hp||0));
   },
   // ── 청동전사 전용 ──
@@ -253,7 +276,19 @@ const stat = {
   transformCost: pl => Math.max(30, 60 - 15*L(pl,'transcost')),
   transformDur: pl => 5 + 2*L(pl,'transdur'),
   pounceCd: pl => 4 * (1 - .2*L(pl,'pouncecd')),
-  pounceDmg: pl => 20 * (1 + .3*L(pl,'pouncedmg'))
+  pounceDmg: pl => 20 * (1 + .3*L(pl,'pouncedmg')),
+  // ── 손지안(특전사) 전용 ──
+  meleeCd: pl => .48 / (1 + .15*L(pl,'swiftglaive') + (pl.G.atkSpd||0)/100),
+  meleeDmg: pl => (14 + (pl.G.bellDmg||0)*.3) * (1 + .2*L(pl,'heavyglaive')),
+  meleeArc: pl => .95 * (1 + .15*L(pl,'wideglaive') + (pl.G.fanR||0)/200),
+  meleeRange: pl => 95 * (1 + .15*L(pl,'wideglaive') + (pl.G.fanR||0)/300),
+  taserCd: pl => Math.max(.5, 1.1 * (1 - .15*L(pl,'taserheat')) - (pl.G.atkSpd||0)/200),
+  taserDmg: pl => 18 * (1 + .2*L(pl,'taserdmg') + (pl.G.bellDmg||0)/100),
+  shockTime: pl => 2.2 + .5*L(pl,'shocklong'),
+  thrustCd: pl => 3.2 * (1 - .2*L(pl,'thrustcd')),
+  thrustDmg: pl => 20 * (1 + .25*L(pl,'thrustdmg')),
+  thrustMul: pl => 2 + .5*L(pl,'execbonus'),
+  tacArmorPct: pl => Math.min(.35, .07 * L(pl,'tacarmor'))
 };
 const xpNeed = pl => 9 + (pl.lv - 1) * 6;
 
@@ -304,13 +339,14 @@ function pickFreeColor() {
   const used = new Set([...players.values()].map(p => p.color));
   return COLORS.find(c => !used.has(c)) || COLORS[players.size % COLORS.length];
 }
-const CLASS_NAMES = { mudang:'무당', jeonsa:'청동전사', beomjok:'범족사냥꾼' };
+const CLASS_NAMES = { mudang:'무당', jeonsa:'청동전사', beomjok:'범족사냥꾼', soldier:'손지안' };
 const CLASS_WEAPON = {
   mudang:  { name:'낡은 방울', mod:5 },
   jeonsa:  { name:'녹슨 비파형 동검', mod:5 },
-  beomjok: { name:'낡은 사냥칼', mod:5 }
+  beomjok: { name:'낡은 사냥칼', mod:5 },
+  soldier: { name:'노획한 언월도', mod:5 }
 };
-function normCls(cls) { return cls === 'jeonsa' || cls === 'beomjok' ? cls : 'mudang'; }
+function normCls(cls) { return cls === 'jeonsa' || cls === 'beomjok' || cls === 'soldier' ? cls : 'mudang'; }
 function startWeapon(cls) {
   const w = CLASS_WEAPON[cls];
   return { id: itemUid++, slot:'bell', r:0, name:w.name, base:w.name, mods:[{k:'bellDmg',v:w.mod,imp:true}], leg:null };
@@ -327,7 +363,7 @@ function newPlayer(id, ws, cls) {
     lv: 1, xp: 0, up: {}, pendingLv: 0, choosing: null,
     atkCd: 0, sumCd: 0, salCd: 0, invCd: 0, obangCd: 0,
     oil: 0, oilTotal: 0, souls: 0, fury: 0, sinceHit: 99, chargeCd: 0, chargeT: 0, frenzyT: 0, frenzyTick: 0,
-    ferocity: 0, transformed: false, transformT: 0, transformCd: 0, pounceCd: 0,
+    ferocity: 0, transformed: false, transformT: 0, transformCd: 0, pounceCd: 0, thrustCd: 0,
     kills: 0, legends: 0, alive: true, classSet: false,
     eq: { bell:null, fan:null, robe:null, trinket:null }, bag: [], G: {}, leg: new Set(),
     input: { dx: 0, dy: 0, atk: false }
@@ -477,6 +513,7 @@ function hurt(pl, d) {
   if (!pl.alive) return;
   if (pl.cls === 'jeonsa') { d *= (1 - stat.armorPct(pl)); pl.fury = Math.min(stat.maxFury(pl), pl.fury + 10); pl.sinceHit = 0; }
   else if (pl.cls === 'beomjok') { pl.ferocity = Math.min(stat.maxFerocity(pl), pl.ferocity + 8); pl.sinceHit = 0; }
+  else if (pl.cls === 'soldier') { d *= (1 - stat.tacArmorPct(pl)); }
   pl.hp -= d; pl.invCd = .4;
   ev('hurt', { id: pl.id, x: pl.x, y: pl.y, amt: Math.round(d) });
   if (HAS(pl,'obang') && pl.obangCd <= 0 && pl.hp > 0) {
@@ -567,6 +604,36 @@ function pounce(pl) {
   const dmg = stat.pounceDmg(pl);
   for (const e of room.en) { if (e.hp<=0) continue; const d=Math.hypot(e.x-pl.x,e.y-pl.y); if (d<90) { hitEnemy(e, dmg, dx*300, dy*300, true, pl.id, 'pounce'); applyBleed(e, pl); e.st = Math.max(e.st, 1); } }
 }
+// ── 손지안 전투 ── 근접(베기)과 원거리(테이저)를 함께 쓴다. 테이저에 맞은 적은 감전되고, 찌르기는 감전된 적에게 추가 피해를 준다.
+function glaiveSlash(pl) {
+  ev('slash', { x: pl.x, y: pl.y, face: pl.face, r: stat.meleeRange(pl), arc: stat.meleeArc(pl) });
+  const R = stat.meleeRange(pl), half = stat.meleeArc(pl)/2, dmg = stat.meleeDmg(pl);
+  for (const e of room.en) {
+    if (e.hp<=0) continue;
+    const dx=e.x-pl.x, dy=e.y-pl.y, d=Math.hypot(dx,dy);
+    if (d > R+e.r) continue;
+    let da = Math.atan2(dy,dx) - pl.face; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI;
+    if (Math.abs(da) > half) continue;
+    hitEnemy(e, dmg, dx/(d||1)*200, dy/(d||1)*200, true, pl.id, 'glaive');
+    if (L(pl,'fieldheal') && Math.random() < .15*L(pl,'fieldheal')) pl.hp = Math.min(pl.max, pl.hp + dmg*.5);
+  }
+}
+function taserShot(pl) {
+  ev('taser', { x: pl.x, y: pl.y, face: pl.face });
+  room.proj.push({ x: pl.x+Math.cos(pl.face)*16, y: pl.y+Math.sin(pl.face)*16, vx: Math.cos(pl.face)*560, vy: Math.sin(pl.face)*560, t:0, life:.8, hits: new Set(), pierce:1, owner: pl.id, kind:'taser' });
+}
+function thrust(pl) {
+  if (pl.thrustCd > 0) return;
+  pl.thrustCd = stat.thrustCd(pl); pl.invCd = Math.max(pl.invCd, .2);
+  ev('thrust', { x: pl.x, y: pl.y, face: pl.face });
+  const dx = Math.cos(pl.face), dy = Math.sin(pl.face);
+  pl.x = clamp(pl.x + dx*110, 20, WS_SIZE-20); pl.y = clamp(pl.y + dy*110, 20, WS_SIZE-20);
+  collideObs(pl, 14);
+  const dmg = stat.thrustDmg(pl), mul = stat.thrustMul(pl);
+  for (const e of room.en) { if (e.hp<=0) continue; const d=Math.hypot(e.x-pl.x,e.y-pl.y); if (d<100) {
+    hitEnemy(e, dmg * (e.shockT>0 ? mul : 1), dx*260, dy*260, true, pl.id, 'thrust');
+  } }
+}
 function summon(pl) {
   if (pl.sumCd > 0) return;
   if (pl.souls <= 0) return;
@@ -641,6 +708,9 @@ function tickPlayer(pl) {
       else { pl.atkCd = stat.dartCd(pl); dart(pl); }
     }
     if (pl.sinceHit > 2.5) pl.ferocity = Math.max(0, pl.ferocity - 10*DT);
+  } else if (pl.cls === 'soldier') {
+    pl.thrustCd -= DT;
+    if (pl.input.atk && pl.atkCd <= 0) { pl.atkCd = stat.meleeCd(pl); glaiveSlash(pl); }
   } else {
     if (pl.input.atk && pl.atkCd <= 0) { pl.atkCd = stat.atkCd(pl); fireBell(pl); }
     if (L(pl,'auto') && pl.souls >= stat.maxSouls(pl) && pl.sumCd <= 0) summon(pl);
@@ -704,6 +774,9 @@ function tick() {
         if (pr.kind === 'dart') {
           hitEnemy(e, owner?stat.dartDmg(owner):8, pr.vx*.25, pr.vy*.25, true, pr.owner, 'dart');
           if (owner) { applyBleed(e, owner); owner.ferocity = Math.min(stat.maxFerocity(owner), owner.ferocity+6); owner.sinceHit=0; }
+        } else if (pr.kind === 'taser') {
+          hitEnemy(e, owner?stat.taserDmg(owner):10, pr.vx*.25, pr.vy*.25, true, pr.owner, 'taser');
+          e.shockT = Math.max(e.shockT||0, owner?stat.shockTime(owner):2.2);
         } else {
           hitEnemy(e, stat.bellDmg(owner||{up:{},G:{}}), pr.vx*.25, pr.vy*.25, true, pr.owner, 'bell');
         }
@@ -746,7 +819,7 @@ function tick() {
     if (e.hp<=0) continue;
     const tgt = nearestPlayer(e.x,e.y);
     const dx = tgt?tgt.x-e.x:0, dy = tgt?tgt.y-e.y:0, d = Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d;
-    const slow = e.curse>0?.5:1; let vx=0,vy=0;
+    const slow = (e.curse>0||e.shockT>0)?.5:1; let vx=0,vy=0;
     e.cd-=DT; e.st-=DT;
     if (e.type==='charger') {
       if (e.state==='aim') { if (e.st<=0) { e.state='dash'; e.st=.42; } }
@@ -764,7 +837,7 @@ function tick() {
     } else { vx=ux*e.spd*slow; vy=uy*e.spd*slow; }
     e.x+=(vx+e.kx)*DT; e.y+=(vy+e.ky)*DT; e.kx*=damp; e.ky*=damp; e.wob+=DT*6;
     collideObs(e,e.r); e.x=clamp(e.x,e.r,WS_SIZE-e.r); e.y=clamp(e.y,e.r,WS_SIZE-e.r);
-    e.hitCd-=DT; e.flash-=DT; e.curse-=DT;
+    e.hitCd-=DT; e.flash-=DT; e.curse-=DT; if (e.shockT>0) e.shockT-=DT;
     if (e.burn>0) { e.burn-=DT; e.burnT=(e.burnT||0)+DT; if (e.burnT>=.5) { e.burnT=0; const bOwner=e.lastSrc?players.get(e.lastSrc):null; hitEnemy(e, bOwner?stat.bellDmg(bOwner)*.45:6, 0, 0, false, e.lastSrc, 'burn'); } }
     if (e.bleedT>0) { e.bleedT-=DT; e.bleedTick=(e.bleedTick||0)+DT; if (e.bleedTick>=.5) { e.bleedTick=0; const owner=e.bleedSrc?players.get(e.bleedSrc):null; hitEnemy(e, owner?stat.bleedDmg(owner):3, 0, 0, false, e.bleedSrc, 'bleed'); } }
     if (tgt && d<e.r+14 && e.hitCd<=0 && tgt.invCd<=0) { hurt(tgt, e.state==='dash'?Math.round(e.dmg*1.3):e.dmg); e.hitCd=.8; }
@@ -823,8 +896,8 @@ function broadcastState() {
     type: 'state', t: room.t, c: Math.round(room.c*10)/10, stage: room.stage, trans: room.trans, over: room.over,
     obs: room.obs.map(o => ({ x:Math.round(o.x), y:Math.round(o.y), r:Math.round(o.r*o.rise), kind:o.kind })),
     en: room.en.map(e => ({ type:e.type, x:Math.round(e.x), y:Math.round(e.y), r:e.r, hp:Math.round(e.hp), max:Math.round(e.max),
-      flash:e.flash>0, curse:e.curse>0, state:e.state, dx:e.dx, dy:e.dy, st:e.st, wob:e.wob, charge:e.charge, fuse:e.fuse, burn:e.burn>0, bleed:e.bleedT>0 })),
-    proj: room.proj.map(p => ({ x:Math.round(p.x), y:Math.round(p.y), vx:p.vx, vy:p.vy })),
+      flash:e.flash>0, curse:e.curse>0, state:e.state, dx:e.dx, dy:e.dy, st:e.st, wob:e.wob, charge:e.charge, fuse:e.fuse, burn:e.burn>0, bleed:e.bleedT>0, shock:e.shockT>0 })),
+    proj: room.proj.map(p => ({ x:Math.round(p.x), y:Math.round(p.y), vx:p.vx, vy:p.vy, kind:p.kind })),
     eproj: room.eproj.map(q => ({ x:Math.round(q.x), y:Math.round(q.y), r:q.r })),
     sp: room.sp.map(s => ({ owner:s.owner, x:Math.round(s.x), y:Math.round(s.y), idx:s.idx, life:s.life, t:s.t })),
     drops: room.drops.filter(d=>!d.got).map(d => ({ x:Math.round(d.x), y:Math.round(d.y), kind:d.kind })),
@@ -875,6 +948,8 @@ wss.on('connection', ws => {
         if (msg.which==='sum') charge(pl); else if (msg.which==='sal') frenzy(pl); else if (msg.which==='pur') purify(pl);
       } else if (pl.cls === 'beomjok') {
         if (msg.which==='sum') tigerForm(pl); else if (msg.which==='sal') pounce(pl); else if (msg.which==='pur') purify(pl);
+      } else if (pl.cls === 'soldier') {
+        if (msg.which==='sum') taserShot(pl); else if (msg.which==='sal') thrust(pl); else if (msg.which==='pur') purify(pl);
       } else {
         if (msg.which==='sum') summon(pl); else if (msg.which==='sal') salpuri(pl); else if (msg.which==='pur') purify(pl);
       }
@@ -889,7 +964,7 @@ wss.on('connection', ws => {
     } else if (msg.type === 'restart') {
       // 캐릭터(레벨·장비·가방)는 파티가 전멸해도 그대로 이어간다 — 구역(맵·저주·적)만 새로 만든다.
       if (room.over) { newRoom(); for (const p2 of players.values()) { p2.hp=stat.maxHp(p2);p2.max=stat.maxHp(p2);p2.oil=0;p2.souls=0;p2.fury=0;p2.chargeCd=0;p2.chargeT=0;p2.frenzyT=0;
-        p2.ferocity=0;p2.transformed=false;p2.transformT=0;p2.transformCd=0;p2.pounceCd=0;
+        p2.ferocity=0;p2.transformed=false;p2.transformT=0;p2.transformCd=0;p2.pounceCd=0;p2.thrustCd=0;
         p2.kills=0;p2.alive=true;p2.pendingLv=0;p2.choosing=null;
         p2.x=clamp(WS_SIZE/2+(Math.random()*80-40),20,WS_SIZE-20); p2.y=clamp(WS_SIZE/2+(Math.random()*80-40),20,WS_SIZE-20);
         sendTo(p2, { type:'welcome', id:p2.id, color:p2.color, world:{w:WS_SIZE,h:WS_SIZE,ts:TS,tn:TN}, seed: room.seed, trans:false }); } }
