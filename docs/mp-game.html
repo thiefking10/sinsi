@@ -206,7 +206,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
           <b>범족사냥꾼</b><small>평소엔 발톱을 던져 피를 흘리게 하고, 변신하면 빠르고 사나운 근접 맹수가 된다.</small>
         </button>
         <button class="clspick" id="clsSoldier" data-cls="soldier">
-          <b>손지안</b><small>언월도로 근접 베기와 원거리 테이저를 함께 쓴다. 감전시킨 적을 찌르기로 마무리한다.</small>
+          <b>손지안</b><small>공격은 자동으로 판단한다 — 적이 가까우면 언월도 베기, 멀면 테이저가 나간다. 감전된 적은 찌르기로 마무리하고, 위기엔 시간정지로 버틴다.</small>
         </button>
       </div>
       <input id="nameInput" maxlength="12" placeholder="이름 (무당1 등 기본값)">
@@ -379,9 +379,9 @@ function applyClassUI(){
     $('bSal').querySelector('span').textContent='도약';
     $('bAtk').querySelector('span').textContent=myTransformed?'발톱':'사냥';
   }else if(soldier){
-    $('bSum').querySelector('span').textContent='테이저';
+    $('bSum').querySelector('span').textContent='시간정지';
     $('bSal').querySelector('span').textContent='찌르기';
-    $('bAtk').querySelector('span').textContent='베기';
+    $('bAtk').querySelector('span').textContent='베기/테이저';
   }else{
     $('bSum').querySelector('span').textContent='초혼';
     $('bSal').querySelector('span').textContent='살풀이';
@@ -458,6 +458,7 @@ function handleEvent(e){
   else if(e.type==='pounce'){SFX.pounce();fx.push({type:'swipe',img:FX_SPR.claw,x:e.x,y:e.y,face:e.face,r:90,arc:.7,t:0,life:.18});}
   else if(e.type==='taser'){SFX.zap();}
   else if(e.type==='thrust'){SFX.dash();shake=Math.max(shake,.2);fx.push({type:'swipe',img:FX_SPR.slash,x:e.x,y:e.y,face:e.face,r:100,arc:.35,t:0,life:.16});}
+  else if(e.type==='timestop'){SFX.pur();shake=Math.max(shake,.3);flash=Math.max(flash,.25);fx.push({type:'ring',x:e.x,y:e.y,t:0,life:.6,max:e.r,col:'200,230,255',thin:false});}
 }
 
 /* ───────── 입력 ───────── */
@@ -654,6 +655,9 @@ function drawEnemy(e){
   if(e.bleed){g.fillStyle='rgba(194,65,58,.85)';for(let k=0;k<3;k++){const a=k*2.1+e.wob;g.beginPath();g.arc(e.x+Math.cos(a)*(r+4),e.y+Math.sin(a)*(r+4),1.6,0,6.28);g.fill();}}
   if(e.shock){g.strokeStyle='rgba(120,200,255,.9)';g.lineWidth=1.6;for(let k=0;k<3;k++){const a=k*2.4+e.wob*1.7,rr=r+5;
     g.beginPath();g.moveTo(e.x+Math.cos(a)*rr,e.y+Math.sin(a)*rr);g.lineTo(e.x+Math.cos(a+.5)*(rr-3),e.y+Math.sin(a+.5)*(rr-3));g.lineTo(e.x+Math.cos(a+1)*rr,e.y+Math.sin(a+1)*rr);g.stroke();}}
+  if(e.frozen){g.fillStyle='rgba(200,230,255,.28)';g.beginPath();g.arc(e.x,e.y,r+2,0,6.28);g.fill();
+    g.strokeStyle='rgba(230,245,255,.85)';g.lineWidth=1.4;for(let k=0;k<4;k++){const a=k/4*6.28;
+      g.beginPath();g.moveTo(e.x,e.y);g.lineTo(e.x+Math.cos(a)*(r+3),e.y+Math.sin(a)*(r+3));g.stroke();}}
   if(e.type!=='boss'&&e.hp<e.max&&e.hp>0){g.fillStyle='rgba(0,0,0,.6)';g.fillRect(e.x-r,e.y-r-9,r*2,4);
     g.fillStyle='#c2413c';g.fillRect(e.x-r,e.y-r-9,r*2*Math.max(0,e.hp/e.max),4);}
 }

@@ -94,7 +94,7 @@ const UP_SOLDIER = [
   { id:'wideglaive', name:'넓은 베기',   max:3, desc:l=>`언월도 사거리·범위가 ${15*(l+1)}% 넓어진다` },
   { id:'swiftglaive',name:'빠른 손',     max:4, desc:()=>'베기를 15% 더 빨리 휘두른다' },
   { id:'heavyglaive',name:'짓누르는 일격', max:3, desc:()=>'베기 피해 +20%' },
-  { id:'taserdmg',   name:'고압 전극',   max:3, desc:()=>'테이저 피해 +20%' },
+  { id:'taserdmg',   name:'고압 전극',   max:3, desc:()=>'적이 멀 때 자동으로 나가는 테이저 피해 +20%' },
   { id:'taserheat',  name:'냉각 개선',   max:3, desc:()=>'테이저 대기시간 −15%' },
   { id:'shocklong',  name:'긴 감전',     max:3, desc:()=>'감전 지속시간 +0.5초' },
   { id:'thrustdmg',  name:'꿰뚫는 찌르기', max:3, desc:()=>'찌르기 피해 +25%' },
@@ -103,7 +103,9 @@ const UP_SOLDIER = [
   { id:'fieldheal',  name:'전장 응급처치', max:2, desc:()=>'베기가 적중하면 가끔 체력을 되찾는다' },
   { id:'tacarmor',   name:'전술 장갑',   max:3, desc:()=>'받는 피해 −7%' },
   { id:'svital',     name:'손지안의 가호', max:3, desc:()=>'최대 체력 +28, 체력을 모두 되찾는다' },
-  { id:'fieldsense', name:'전장 감각',   max:2, desc:()=>'신수를 더 멀리서 끌어오고 더 자주 줍는다' }
+  { id:'fieldsense', name:'전장 감각',   max:2, desc:()=>'신수를 더 멀리서 끌어오고 더 자주 줍는다' },
+  { id:'freezelong', name:'멈춘 순간',   max:2, desc:()=>'시간정지 지속시간 +0.6초' },
+  { id:'freezecd',   name:'빠른 재가동', max:3, desc:()=>'시간정지 대기시간 −2초' }
 ];
 const UP_SOLDIER_BY = {}; UP_SOLDIER.forEach(u => UP_SOLDIER_BY[u.id] = u);
 
@@ -288,7 +290,10 @@ const stat = {
   thrustCd: pl => 3.2 * (1 - .2*L(pl,'thrustcd')),
   thrustDmg: pl => 20 * (1 + .25*L(pl,'thrustdmg')),
   thrustMul: pl => 2 + .5*L(pl,'execbonus'),
-  tacArmorPct: pl => Math.min(.35, .07 * L(pl,'tacarmor'))
+  tacArmorPct: pl => Math.min(.35, .07 * L(pl,'tacarmor')),
+  timeStopCd: pl => Math.max(6, 15 - 2*L(pl,'freezecd')),
+  timeStopDur: pl => 2.5 + .6*L(pl,'freezelong'),
+  timeStopR: pl => 240
 };
 const xpNeed = pl => 9 + (pl.lv - 1) * 6;
 
@@ -363,7 +368,7 @@ function newPlayer(id, ws, cls) {
     lv: 1, xp: 0, up: {}, pendingLv: 0, choosing: null,
     atkCd: 0, sumCd: 0, salCd: 0, invCd: 0, obangCd: 0,
     oil: 0, oilTotal: 0, souls: 0, fury: 0, sinceHit: 99, chargeCd: 0, chargeT: 0, frenzyT: 0, frenzyTick: 0,
-    ferocity: 0, transformed: false, transformT: 0, transformCd: 0, pounceCd: 0, thrustCd: 0,
+    ferocity: 0, transformed: false, transformT: 0, transformCd: 0, pounceCd: 0, thrustCd: 0, timeStopCd: 0,
     kills: 0, legends: 0, alive: true, classSet: false,
     eq: { bell:null, fan:null, robe:null, trinket:null }, bag: [], G: {}, leg: new Set(),
     input: { dx: 0, dy: 0, atk: false }
@@ -634,6 +639,13 @@ function thrust(pl) {
     hitEnemy(e, dmg * (e.shockT>0 ? mul : 1), dx*260, dy*260, true, pl.id, 'thrust');
   } }
 }
+function timeStop(pl) {
+  if (pl.timeStopCd > 0) return;
+  pl.timeStopCd = stat.timeStopCd(pl);
+  const R = stat.timeStopR(pl), dur = stat.timeStopDur(pl);
+  ev('timestop', { x: pl.x, y: pl.y, r: R });
+  for (const e of room.en) { if (e.hp<=0) continue; if (Math.hypot(e.x-pl.x, e.y-pl.y) < R+e.r) e.frozenT = Math.max(e.frozenT||0, dur); }
+}
 function summon(pl) {
   if (pl.sumCd > 0) return;
   if (pl.souls <= 0) return;
@@ -709,8 +721,13 @@ function tickPlayer(pl) {
     }
     if (pl.sinceHit > 2.5) pl.ferocity = Math.max(0, pl.ferocity - 10*DT);
   } else if (pl.cls === 'soldier') {
-    pl.thrustCd -= DT;
-    if (pl.input.atk && pl.atkCd <= 0) { pl.atkCd = stat.meleeCd(pl); glaiveSlash(pl); }
+    pl.thrustCd -= DT; pl.timeStopCd -= DT;
+    if (pl.input.atk && pl.atkCd <= 0) {
+      let nearest = null, nd = Infinity;
+      for (const e of room.en) { if (e.hp<=0) continue; const dd = Math.hypot(e.x-pl.x, e.y-pl.y) - e.r; if (dd < nd) { nd = dd; nearest = e; } }
+      if (nearest && nd <= stat.meleeRange(pl)) { pl.atkCd = stat.meleeCd(pl); glaiveSlash(pl); }
+      else { pl.atkCd = stat.taserCd(pl); taserShot(pl); }
+    }
   } else {
     if (pl.input.atk && pl.atkCd <= 0) { pl.atkCd = stat.atkCd(pl); fireBell(pl); }
     if (L(pl,'auto') && pl.souls >= stat.maxSouls(pl) && pl.sumCd <= 0) summon(pl);
@@ -820,8 +837,12 @@ function tick() {
     const tgt = nearestPlayer(e.x,e.y);
     const dx = tgt?tgt.x-e.x:0, dy = tgt?tgt.y-e.y:0, d = Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d;
     const slow = (e.curse>0||e.shockT>0)?.5:1; let vx=0,vy=0;
+    const frozen = e.frozenT > 0;
+    if (frozen) e.frozenT -= DT;
     e.cd-=DT; e.st-=DT;
-    if (e.type==='charger') {
+    if (frozen) {
+      // 시간정지: 움직이지도, 상태를 진행하지도, 접촉 피해를 주지도 않는다
+    } else if (e.type==='charger') {
       if (e.state==='aim') { if (e.st<=0) { e.state='dash'; e.st=.42; } }
       else if (e.state==='dash') { vx=e.dx*540*slow; vy=e.dy*540*slow; if (e.st<=0) { e.state='rest'; e.st=.5; } }
       else if (e.state==='rest') { if (e.st<=0) e.state='chase'; }
@@ -835,13 +856,14 @@ function tick() {
       if (e.fuse>0) { e.fuse-=DT; if (e.fuse<=0) { e.fused=true; e.noReward=true; e.hp=0; explode(e.x,e.y,90,40); } }
       else { vx=ux*e.spd*slow; vy=uy*e.spd*slow; if (d<50) e.fuse=.7; }
     } else { vx=ux*e.spd*slow; vy=uy*e.spd*slow; }
-    e.x+=(vx+e.kx)*DT; e.y+=(vy+e.ky)*DT; e.kx*=damp; e.ky*=damp; e.wob+=DT*6;
+    if (!frozen) { e.x+=(vx+e.kx)*DT; e.y+=(vy+e.ky)*DT; }
+    e.kx*=damp; e.ky*=damp; e.wob+=DT*6;
     collideObs(e,e.r); e.x=clamp(e.x,e.r,WS_SIZE-e.r); e.y=clamp(e.y,e.r,WS_SIZE-e.r);
     e.hitCd-=DT; e.flash-=DT; e.curse-=DT; if (e.shockT>0) e.shockT-=DT;
     if (e.burn>0) { e.burn-=DT; e.burnT=(e.burnT||0)+DT; if (e.burnT>=.5) { e.burnT=0; const bOwner=e.lastSrc?players.get(e.lastSrc):null; hitEnemy(e, bOwner?stat.bellDmg(bOwner)*.45:6, 0, 0, false, e.lastSrc, 'burn'); } }
     if (e.bleedT>0) { e.bleedT-=DT; e.bleedTick=(e.bleedTick||0)+DT; if (e.bleedTick>=.5) { e.bleedTick=0; const owner=e.bleedSrc?players.get(e.bleedSrc):null; hitEnemy(e, owner?stat.bleedDmg(owner):3, 0, 0, false, e.bleedSrc, 'bleed'); } }
-    if (tgt && d<e.r+14 && e.hitCd<=0 && tgt.invCd<=0) { hurt(tgt, e.state==='dash'?Math.round(e.dmg*1.3):e.dmg); e.hitCd=.8; }
-    if (e.type==='boss') {
+    if (!frozen && tgt && d<e.r+14 && e.hitCd<=0 && tgt.invCd<=0) { hurt(tgt, e.state==='dash'?Math.round(e.dmg*1.3):e.dmg); e.hitCd=.8; }
+    if (e.type==='boss' && !frozen) {
       e.wave-=DT; if (e.wave<=0) { e.wave=3.2; ev('shockwave', {x:e.x,y:e.y}); for (const pl of alivePlayers()) if (pl.invCd<=0 && Math.abs(Math.hypot(pl.x-e.x,pl.y-e.y)-360)<40) hurt(pl,16); }
       e.summonT-=DT; if (e.summonT<=0) { e.summonT=7; for (let k=0;k<4;k++) { const a=k/4*6.28; spawnEnemy(k%2?'ghoul':'charger', e.x+Math.cos(a)*70, e.y+Math.sin(a)*70); } }
     }
@@ -896,7 +918,7 @@ function broadcastState() {
     type: 'state', t: room.t, c: Math.round(room.c*10)/10, stage: room.stage, trans: room.trans, over: room.over,
     obs: room.obs.map(o => ({ x:Math.round(o.x), y:Math.round(o.y), r:Math.round(o.r*o.rise), kind:o.kind })),
     en: room.en.map(e => ({ type:e.type, x:Math.round(e.x), y:Math.round(e.y), r:e.r, hp:Math.round(e.hp), max:Math.round(e.max),
-      flash:e.flash>0, curse:e.curse>0, state:e.state, dx:e.dx, dy:e.dy, st:e.st, wob:e.wob, charge:e.charge, fuse:e.fuse, burn:e.burn>0, bleed:e.bleedT>0, shock:e.shockT>0 })),
+      flash:e.flash>0, curse:e.curse>0, state:e.state, dx:e.dx, dy:e.dy, st:e.st, wob:e.wob, charge:e.charge, fuse:e.fuse, burn:e.burn>0, bleed:e.bleedT>0, shock:e.shockT>0, frozen:e.frozenT>0 })),
     proj: room.proj.map(p => ({ x:Math.round(p.x), y:Math.round(p.y), vx:p.vx, vy:p.vy, kind:p.kind })),
     eproj: room.eproj.map(q => ({ x:Math.round(q.x), y:Math.round(q.y), r:q.r })),
     sp: room.sp.map(s => ({ owner:s.owner, x:Math.round(s.x), y:Math.round(s.y), idx:s.idx, life:s.life, t:s.t })),
@@ -949,7 +971,7 @@ wss.on('connection', ws => {
       } else if (pl.cls === 'beomjok') {
         if (msg.which==='sum') tigerForm(pl); else if (msg.which==='sal') pounce(pl); else if (msg.which==='pur') purify(pl);
       } else if (pl.cls === 'soldier') {
-        if (msg.which==='sum') taserShot(pl); else if (msg.which==='sal') thrust(pl); else if (msg.which==='pur') purify(pl);
+        if (msg.which==='sum') timeStop(pl); else if (msg.which==='sal') thrust(pl); else if (msg.which==='pur') purify(pl);
       } else {
         if (msg.which==='sum') summon(pl); else if (msg.which==='sal') salpuri(pl); else if (msg.which==='pur') purify(pl);
       }
@@ -964,7 +986,7 @@ wss.on('connection', ws => {
     } else if (msg.type === 'restart') {
       // 캐릭터(레벨·장비·가방)는 파티가 전멸해도 그대로 이어간다 — 구역(맵·저주·적)만 새로 만든다.
       if (room.over) { newRoom(); for (const p2 of players.values()) { p2.hp=stat.maxHp(p2);p2.max=stat.maxHp(p2);p2.oil=0;p2.souls=0;p2.fury=0;p2.chargeCd=0;p2.chargeT=0;p2.frenzyT=0;
-        p2.ferocity=0;p2.transformed=false;p2.transformT=0;p2.transformCd=0;p2.pounceCd=0;p2.thrustCd=0;
+        p2.ferocity=0;p2.transformed=false;p2.transformT=0;p2.transformCd=0;p2.pounceCd=0;p2.thrustCd=0;p2.timeStopCd=0;
         p2.kills=0;p2.alive=true;p2.pendingLv=0;p2.choosing=null;
         p2.x=clamp(WS_SIZE/2+(Math.random()*80-40),20,WS_SIZE-20); p2.y=clamp(WS_SIZE/2+(Math.random()*80-40),20,WS_SIZE-20);
         sendTo(p2, { type:'welcome', id:p2.id, color:p2.color, world:{w:WS_SIZE,h:WS_SIZE,ts:TS,tn:TN}, seed: room.seed, trans:false }); } }
