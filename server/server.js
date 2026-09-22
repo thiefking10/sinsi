@@ -116,23 +116,51 @@ const AFF = {
   regen:{l:'초당 체력 회복',u:'',min:.5,max:1.5,w:8,dec:1,pre:'숨 고르는'},
   fanR:{l:'살풀이 범위',u:'%',min:8,max:18,w:.6,pre:'넓은'}
 };
-const BASE = {
-  bell:{names:['낡은 방울','놋쇠 방울','청동 방울','신령 방울'],imp:'bellDmg'},
-  fan:{names:['종이 부채','비단 부채','오방 부채','신령 부채'],imp:'fanR'},
-  robe:{names:['삼베 무복','무명 무복','비단 무복','신령 무복'],imp:'hp'},
-  trinket:{names:['나무 노리개','옥 노리개','산호 노리개','신령 노리개'],imp:'crit'}
+// 슬롯별 기본 이름은 직업마다 다르게 부른다(방울/검/발톱). 아이템 자체(수치·희귀도)는
+// 직업과 무관하게 굴리고, 실제 이름은 "누가 줍느냐"(pl.cls)에 맞춰 줍는 순간 정해진다.
+const BASE_BY_CLS = {
+  mudang: {
+    bell:{names:['낡은 방울','놋쇠 방울','청동 방울','신령 방울'],imp:'bellDmg'},
+    fan:{names:['종이 부채','비단 부채','오방 부채','신령 부채'],imp:'fanR'},
+    robe:{names:['삼베 무복','무명 무복','비단 무복','신령 무복'],imp:'hp'},
+    trinket:{names:['나무 노리개','옥 노리개','산호 노리개','신령 노리개'],imp:'crit'}
+  },
+  jeonsa: {
+    bell:{names:['낡은 청동검','벼려진 청동검','비파형 동검','신령 동검'],imp:'bellDmg'},
+    fan:{names:['나무 방패','청동 방패','문양 방패','신령 방패'],imp:'fanR'},
+    robe:{names:['가죽 갑주','청동 갑주','문양 갑주','신령 갑주'],imp:'hp'},
+    trinket:{names:['나무 노리개','옥 노리개','산호 노리개','신령 노리개'],imp:'crit'}
+  },
+  beomjok: {
+    bell:{names:['낡은 사냥칼','벼린 사냥칼','짐승뼈 발톱','신령 발톱'],imp:'bellDmg'},
+    fan:{names:['나무 덫','뼈 덫','문양 덫','신령 덫'],imp:'fanR'},
+    robe:{names:['거친 가죽옷','짐승 가죽옷','무늬 가죽옷','신령 가죽옷'],imp:'hp'},
+    trinket:{names:['나무 노리개','옥 노리개','산호 노리개','신령 노리개'],imp:'crit'}
+  }
 };
+const BASE = BASE_BY_CLS.mudang; // 드랍 시 수치를 굴릴 때 임시로 쓰는 기본형(줍는 순간 다시 이름 붙임)
 const LEG = [
-  {id:'thunder',slot:'bell',name:'천둥 방울',desc:'방울이 적중하면 20% 확률로 번개가 세 명에게 튄다'},
-  {id:'soulbell',slot:'bell',name:'넋부름 방울',desc:'방울로 쓰러뜨린 적은 넋을 하나 더 남긴다'},
-  {id:'maple',slot:'fan',name:'핏빛 단풍 부채',desc:'살풀이에 걸린 적은 저주가 끝날 때까지 불탄다'},
-  {id:'wind',slot:'fan',name:'풍백의 부채',desc:'살풀이가 적을 멀리 날려 보내고, 대기 시간 −30%'},
-  {id:'obang',slot:'robe',name:'오방신장 무복',desc:'피해를 받으면 원혼 둘이 곁에 나타난다 (3초마다)'},
-  {id:'tiger',slot:'robe',name:'범가죽 무복',desc:'체력이 30% 이하일 때 모든 피해 +60%'},
-  {id:'shackle',slot:'trinket',name:'찢긴 족쇄',desc:'저주 걸린 적이 쓰러지면 터져 주변을 태운다'},
-  {id:'brow',slot:'trinket',name:'동두의 이마쇠',desc:'원혼 수가 절반이 되는 대신 거대해져 피해 +120%'}
+  {id:'thunder',slot:'bell',names:{mudang:'천둥 방울',jeonsa:'천둥 동검',beomjok:'천둥 발톱'},desc:'방울이 적중하면 20% 확률로 번개가 세 명에게 튄다'},
+  {id:'soulbell',slot:'bell',names:{mudang:'넋부름 방울',jeonsa:'넋부름 동검',beomjok:'넋부름 발톱'},desc:'방울로 쓰러뜨린 적은 넋을 하나 더 남긴다'},
+  {id:'maple',slot:'fan',names:{mudang:'핏빛 단풍 부채',jeonsa:'핏빛 단풍 방패',beomjok:'핏빛 단풍 덫'},desc:'살풀이에 걸린 적은 저주가 끝날 때까지 불탄다'},
+  {id:'wind',slot:'fan',names:{mudang:'풍백의 부채',jeonsa:'풍백의 방패',beomjok:'풍백의 덫'},desc:'살풀이가 적을 멀리 날려 보내고, 대기 시간 −30%'},
+  {id:'obang',slot:'robe',names:{mudang:'오방신장 무복',jeonsa:'오방신장 갑주',beomjok:'오방신장 가죽옷'},desc:'피해를 받으면 원혼 둘이 곁에 나타난다 (3초마다)'},
+  {id:'tiger',slot:'robe',names:{mudang:'범가죽 무복',jeonsa:'범가죽 갑주',beomjok:'범가죽 가죽옷'},desc:'체력이 30% 이하일 때 모든 피해 +60%'},
+  {id:'shackle',slot:'trinket',names:{mudang:'찢긴 족쇄',jeonsa:'찢긴 족쇄',beomjok:'찢긴 족쇄'},desc:'저주 걸린 적이 쓰러지면 터져 주변을 태운다'},
+  {id:'brow',slot:'trinket',names:{mudang:'동두의 이마쇠',jeonsa:'동두의 이마쇠',beomjok:'동두의 이마쇠'},desc:'원혼 수가 절반이 되는 대신 거대해져 피해 +120%'}
 ];
 const LEG_BY = {}; LEG.forEach(l => LEG_BY[l.id] = l);
+// 아이템은 슬롯·수치·희귀도만 들고 있고, 표시용 이름은 줍는 사람의 직업에 맞춰 이 함수로 다시 붙인다.
+function nameItemForClass(it, cls) {
+  const base = (BASE_BY_CLS[cls] || BASE_BY_CLS.mudang)[it.slot];
+  const tier = it._tier || 0;
+  if (it.leg) { it.name = (LEG_BY[it.leg].names[cls] || LEG_BY[it.leg].names.mudang); it.base = base.names[tier]; return it; }
+  if (it.r === 0) it.name = base.names[tier];
+  else if (it.r === 1) it.name = AFF[it.mods[1].k].pre + ' ' + base.names[tier];
+  else if (it._flavor) it.name = it._flavor; // 희귀(r=2)는 슬롯과 무관한 무작위 이름이라 고정해서 재사용
+  it.base = base.names[tier];
+  return it;
+}
 const RARE_A = ['저승','단풍','청동','안개','탁록','범','곰','신단','족쇄','구리','무쇠','달'];
 const RARE_B = ['울음','속삭임','한','불씨','맹세','눈물','숨결','그림자'];
 let itemUid = 1;
@@ -148,12 +176,9 @@ function genItem(stage,trans,forceR){
   const mods=[{k:base.imp,v:rollVal(base.imp,ilvl),imp:true}];
   const [a,b]=RAR[r].aff; const n=a+Math.floor(Math.random()*(b-a+1));
   Object.keys(AFF).filter(k=>k!==base.imp).sort(()=>Math.random()-.5).slice(0,n).forEach(k=>mods.push({k,v:rollVal(k,ilvl)}));
-  let name;
-  if(leg)name=leg.name;
-  else if(r===0)name=base.names[tier];
-  else if(r===1)name=AFF[mods[1].k].pre+' '+base.names[tier];
-  else name=RARE_A[Math.random()*RARE_A.length|0]+'의 '+RARE_B[Math.random()*RARE_B.length|0];
-  return {id:itemUid++,slot,r,name,base:base.names[tier],mods,leg:leg?leg.id:null};
+  const flavor = r===2 ? RARE_A[Math.random()*RARE_A.length|0]+'의 '+RARE_B[Math.random()*RARE_B.length|0] : null;
+  const it = {id:itemUid++,slot,r,mods,leg:leg?leg.id:null,_tier:tier,_flavor:flavor};
+  return nameItemForClass(it, 'mudang'); // 드랍 시점엔 아직 누가 주울지 모르니 임시 이름 — 줍을 때 다시 붙인다
 }
 function itemScore(it){ if(!it)return 0; let s=0; for(const m of it.mods)s+=m.v*AFF[m.k].w; return s+(it.leg?45:0); }
 function isUpgrade(pl,it){ return itemScore(it) > itemScore(pl.eq[it.slot]) + .5; }
@@ -734,6 +759,7 @@ function tick() {
       if (l.got) continue;
       if (Math.hypot(pl.x-l.x, pl.y-l.y) < 26) {
         if (pl.bag.length >= BAG_MAX) { if (!l.warned) { ev('bagFull', { id: pl.id }); l.warned = true; } continue; }
+        nameItemForClass(l.it, pl.cls); // 줍는 사람의 직업에 맞는 이름으로 다시 붙인다 (방울/동검/발톱 등)
         pl.bag.push(l.it); l.got = true; if (l.it.r === 3) pl.legends++;
         ev('pick', { id: pl.id, x: pl.x, y: pl.y, name: l.it.name, color: RAR[l.it.r].c, big: l.it.r >= 2 });
         pushInventory(pl);
