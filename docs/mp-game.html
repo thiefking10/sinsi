@@ -720,7 +720,8 @@ function updHud(){
   $('stName').textContent=STAGE_NAME[state.stage];$('stName').style.color=STAGE_COL[state.stage];
   $('cVal').textContent=state.trans?'되돌릴 수 없음':'저주 '+Math.floor(state.c);
   if(me){
-    if(me.cls!==myCls){myCls=me.cls;applyClassUI();}
+    // running(강하 시작 이후)에만 서버 값으로 동기화 — 그 전엔 아직 확정 안 된 내 선택을 서버의 기본값(무당)이 매 프레임 덮어써버림
+    if(running&&me.cls!==myCls){myCls=me.cls;applyClassUI();}
     $('hpFill').style.width=(me.hp/me.max*100)+'%';
     $('xpFill').style.width=(me.xp/me.xpNeed*100)+'%';
     $('lvTxt').textContent='Lv '+me.lv;
