@@ -344,6 +344,37 @@ function setClass(pl, cls) {
   pl.eq.bell = startWeapon(cls);
   recalc(pl); pl.hp = pl.max;
 }
+// 클라이언트가 localStorage에 들고 있던 "이어하기" 캐릭터 스냅샷을 검증해서 적용한다.
+// 이 게임은 서버가 세이브를 들고 있지 않으므로(재배포·슬립 때마다 날아감) 클라이언트를 신뢰하는 캐주얼 협동 프로토타입 전제를 그대로 따른다.
+function validItem(it, slot) {
+  if (!it || typeof it !== 'object') return null;
+  if (!SLOT_KEYS.includes(it.slot)) return null;
+  if (slot && it.slot !== slot) return null;
+  const r = Number.isInteger(it.r) ? clamp(it.r, 0, RAR.length-1) : 0;
+  const mods = Array.isArray(it.mods) ? it.mods.filter(m => m && AFF[m.k] && Number.isFinite(m.v)).slice(0,6).map(m => ({ k:m.k, v: clamp(Number(m.v), 0, 999), imp: !!m.imp })) : [];
+  const leg = (typeof it.leg === 'string' && LEG_BY[it.leg] && LEG_BY[it.leg].slot === it.slot) ? it.leg : null;
+  const out = { id: itemUid++, slot: it.slot, r, mods, leg, _tier: Number.isInteger(it._tier) ? clamp(it._tier,0,3) : 0, _flavor: typeof it._flavor === 'string' ? it._flavor.slice(0,20) : null };
+  return nameItemForClass(out, 'mudang'); // 실제 표시 이름은 setClass 이후 recalc 과정이 아니라 적용 시점에 다시 붙인다
+}
+function applyResume(pl, resume) {
+  if (!resume || typeof resume !== 'object') return;
+  if (Number.isInteger(resume.lv)) pl.lv = clamp(resume.lv, 1, 999);
+  if (Number.isFinite(resume.xp)) pl.xp = clamp(resume.xp, 0, 1e9);
+  if (resume.up && typeof resume.up === 'object') {
+    const up = {};
+    for (const k in resume.up) if (Number.isFinite(resume.up[k])) up[k] = clamp(Math.round(resume.up[k]), 0, 30);
+    pl.up = up;
+  }
+  if (resume.eq && typeof resume.eq === 'object') {
+    for (const sl of SLOT_KEYS) pl.eq[sl] = resume.eq[sl] ? validItem(resume.eq[sl], sl) : null;
+  }
+  if (Array.isArray(resume.bag)) pl.bag = resume.bag.map(it => validItem(it)).filter(Boolean).slice(0, BAG_MAX);
+  if (Number.isFinite(resume.oilTotal)) pl.oilTotal = clamp(resume.oilTotal, 0, 1e9);
+  if (Number.isInteger(resume.kills)) pl.kills = clamp(resume.kills, 0, 1e6);
+  for (const sl of SLOT_KEYS) if (pl.eq[sl]) nameItemForClass(pl.eq[sl], pl.cls);
+  for (const it of pl.bag) nameItemForClass(it, pl.cls);
+  recalc(pl); pl.hp = pl.max;
+}
 
 function ev(type, data) { room.events.push({ type, ...data }); }
 
@@ -780,7 +811,7 @@ function playerView(pl) {
     hp: Math.round(pl.hp), max: pl.max, lv: pl.lv, xp: Math.round(pl.xp), xpNeed: xpNeed(pl), oil: pl.oil, souls: pl.souls,
     maxSouls: stat.maxSouls(pl), fury: Math.round(pl.fury||0), maxFury: pl.cls==='jeonsa'?stat.maxFury(pl):0,
     frenzy: pl.frenzyT>0, ferocity: Math.round(pl.ferocity||0), maxFerocity: pl.cls==='beomjok'?stat.maxFerocity(pl):0,
-    transformed: !!pl.transformed, kills: pl.kills, alive: pl.alive, invFlicker: pl.invCd>0 };
+    transformed: !!pl.transformed, kills: pl.kills, alive: pl.alive, invFlicker: pl.invCd>0, up: pl.up };
 }
 function broadcastState() {
   // 파티가 전멸/승리해서 room이 끝난 상태면, 다시 시작할 때까지 무거운 배열은 안 보낸다(적 수십 마리를 매 틱 얼려서 보낼 이유가 없다).
@@ -852,6 +883,7 @@ wss.on('connection', ws => {
     } else if (msg.type === 'name') {
       if (msg.cls) setClass(pl, msg.cls);
       if (typeof msg.name === 'string' && msg.name.trim()) pl.name = msg.name.slice(0,12);
+      if (msg.resume) applyResume(pl, msg.resume);
       pushInventory(pl);
       sendTo(pl, { type:'classConfirm', cls: pl.cls });
     } else if (msg.type === 'restart') {

@@ -190,19 +190,25 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   <div class="card" id="card">
     <h1>신시<span>협동 강하</span></h1>
     <p>같은 와이파이의 무당들과 함께 저주를 막는다. 함께 싸우고, 함께 버틴다.</p>
-    <div id="clsPick">
-      <button class="clspick sel" id="clsMudang" data-cls="mudang">
-        <b>무당</b><small>방울 원거리 공격, 원혼 소환. 저주를 낮게 눌러두며 싸운다.</small>
-      </button>
-      <button class="clspick" id="clsJeonsa" data-cls="jeonsa">
-        <b>청동전사</b><small>근접 베기, 분노를 모아 돌진·광란. 저주가 높을수록 강해진다.</small>
-      </button>
-      <button class="clspick" id="clsBeomjok" data-cls="beomjok">
-        <b>범족사냥꾼</b><small>평소엔 발톱을 던져 피를 흘리게 하고, 변신하면 빠르고 사나운 근접 맹수가 된다.</small>
-      </button>
+    <div id="resumeBox" style="display:none">
+      <button class="go" id="resumeBtn">이어하기</button>
+      <button class="go ghost" id="newBtn">새로 시작하기</button>
     </div>
-    <input id="nameInput" maxlength="12" placeholder="이름 (무당1 등 기본값)">
-    <button class="go" id="goBtn">강하 시작</button>
+    <div id="freshBox">
+      <div id="clsPick">
+        <button class="clspick sel" id="clsMudang" data-cls="mudang">
+          <b>무당</b><small>방울 원거리 공격, 원혼 소환. 저주를 낮게 눌러두며 싸운다.</small>
+        </button>
+        <button class="clspick" id="clsJeonsa" data-cls="jeonsa">
+          <b>청동전사</b><small>근접 베기, 분노를 모아 돌진·광란. 저주가 높을수록 강해진다.</small>
+        </button>
+        <button class="clspick" id="clsBeomjok" data-cls="beomjok">
+          <b>범족사냥꾼</b><small>평소엔 발톱을 던져 피를 흘리게 하고, 변신하면 빠르고 사나운 근접 맹수가 된다.</small>
+        </button>
+      </div>
+      <input id="nameInput" maxlength="12" placeholder="이름 (무당1 등 기본값)">
+      <button class="go" id="goBtn">강하 시작</button>
+    </div>
     <div id="connMsg"></div>
   </div>
 </div>
@@ -339,6 +345,21 @@ function genTiles(seed,trans){
 /* ───────── 네트워크 ───────── */
 const wsUrl=`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}`;
 let myCls='mudang', myTransformed=false;
+const SAVE_KEY='sinsi_save_v1', CLS_LABEL={mudang:'무당',jeonsa:'청동전사',beomjok:'범족사냥꾼'};
+let charSave=null;
+function loadSave(){try{return JSON.parse(localStorage.getItem(SAVE_KEY));}catch{return null;}}
+function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch{}charSave=null;}
+function buildSnapshot(){
+  const me=state&&state.players&&state.players.find(p=>p.id===myId);
+  if(!me||!myInv)return null;
+  return{name:me.name||'',cls:myCls,lv:me.lv,xp:me.xp,up:me.up||{},kills:me.kills,eq:myInv.eq,bag:myInv.bag,oilTotal:myInv.oilTotal};
+}
+function saveChar(){
+  if(!running)return;
+  const snap=buildSnapshot();if(!snap)return;
+  charSave=snap;
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify(snap));}catch{}
+}
 function applyClassUI(){
   const jeonsa=myCls==='jeonsa', beomjok=myCls==='beomjok';
   $('furyRow').style.display=jeonsa?'flex':'none';
@@ -361,8 +382,10 @@ function applyClassUI(){
 function sendName(){
   if(!ws||ws.readyState!==1)return;
   const el=$('nameInput'); // 죽은 뒤 게임오버 화면이 #card 내용을 통째로 바꿔서 nameInput이 사라진 뒤일 수 있다
-  const nm=el?el.value.trim():'';
-  ws.send(JSON.stringify({type:'name',name:nm,cls:myCls}));
+  const nm=(el&&el.value.trim())||(charSave&&charSave.name)||'';
+  const payload={type:'name',name:nm,cls:myCls};
+  if(charSave)payload.resume={lv:charSave.lv,xp:charSave.xp,up:charSave.up,eq:charSave.eq,bag:charSave.bag,oilTotal:charSave.oilTotal,kills:charSave.kills};
+  ws.send(JSON.stringify(payload));
 }
 function connect(){
   $('connMsg').textContent='서버에 접속 중...';
@@ -384,9 +407,11 @@ function connect(){
       showLevelUp(m);
     }else if(m.type==='levelup_done'){
       $('lvl').classList.remove('show');
+      saveChar();
     }else if(m.type==='inventory'){
       myInv={eq:m.eq,bag:m.bag,G:m.G,legends:m.legends,oilTotal:m.oilTotal};
       if($('inv').classList.contains('show'))renderInv();
+      saveChar();
     }else if(m.type==='full'){
       $('connMsg').textContent='서버가 가득 찼습니다.';
     }
@@ -915,6 +940,21 @@ for(const el of document.querySelectorAll('.clspick')){
   });
 }
 $('goBtn').addEventListener('click',()=>{initAudio();sendName();if(state&&state.over)ws.send(JSON.stringify({type:'restart'}));$('screen').classList.add('hide');running=true;});
+charSave=loadSave();
+if(charSave){
+  $('resumeBox').style.display='';
+  $('freshBox').style.display='none';
+  $('resumeBtn').textContent=`이어하기 — ${CLS_LABEL[charSave.cls]||'무당'} Lv.${charSave.lv||1}${charSave.name?' · '+charSave.name:''}`;
+  myCls=charSave.cls||'mudang';
+}
+$('resumeBtn').addEventListener('click',()=>{initAudio();sendName();$('screen').classList.add('hide');running=true;});
+$('newBtn').addEventListener('click',()=>{
+  clearSave();
+  $('resumeBox').style.display='none';
+  $('freshBox').style.display='';
+});
+setInterval(saveChar,5000);
+addEventListener('beforeunload',saveChar);
 connect();
 requestAnimationFrame(loop);
 })();
