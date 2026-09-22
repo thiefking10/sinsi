@@ -9,7 +9,8 @@ const path = require('path');
 
 const PORT = process.env.PORT || 8765;
 const PUBLIC_DIR = path.join(__dirname, '..', 'docs');
-const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css', '.json':'application/json' };
+const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css', '.json':'application/json',
+  '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.svg':'image/svg+xml' };
 const TICK_MS = 50;
 const DT = TICK_MS / 1000;
 const WS_SIZE = 1700, TS = 68, TN = Math.round(WS_SIZE / TS);
