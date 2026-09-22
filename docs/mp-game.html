@@ -996,6 +996,10 @@ if(charSave){
 $('resumeBtn').addEventListener('click',()=>{initAudio();sendName();$('screen').classList.add('hide');running=true;});
 $('newBtn').addEventListener('click',()=>{
   clearSave();
+  myCls='mudang';
+  document.querySelectorAll('.clspick').forEach(b=>b.classList.toggle('sel',b===$('clsMudang')));
+  applyClassUI();
+  const ni=$('nameInput');if(ni)ni.value='';
   $('resumeBox').style.display='none';
   $('freshBox').style.display='';
 });
